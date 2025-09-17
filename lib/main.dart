@@ -1,6 +1,25 @@
 import 'package:flutter/material.dart';
+import 'screens/welcome_page.dart';
+import 'screens/login_page.dart';
+import 'screens/disclaimer_page.dart';
+import 'screens/home_page.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart';
+import 'firebase_options.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  } catch (e, st) {
+    if (kDebugMode) {
+      // Log but don't crash the app; login will show a helpful message.
+      // ignore: avoid_print
+      print('Firebase init failed: $e\n$st');
+    }
+  }
   runApp(const MyApp());
 }
 
@@ -11,7 +30,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter Demo',
+      title: 'Bolus Connect',
       theme: ThemeData(
         // This is the theme of your application.
         //
@@ -30,7 +49,14 @@ class MyApp extends StatelessWidget {
         // tested with just a hot reload.
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
       ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
+      // Start on the Welcome page before login
+      initialRoute: '/welcome',
+      routes: {
+        '/welcome': (context) => const WelcomePage(),
+        '/login': (context) => const LoginPage(),
+        '/disclaimer': (context) => const DisclaimerPage(),
+        '/home': (context) => const HomePage(),
+      },
     );
   }
 }

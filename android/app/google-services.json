@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1000337125532",
+    "project_id": "bolus-connect-flutter",
+    "storage_bucket": "bolus-connect-flutter.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1000337125532:android:79d555d79039349add3d59",
+        "android_client_info": {
+          "package_name": "com.example.bolus_connect_flutter"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBLWad1bqArwQQQh2jCrlXhyKb5jyueU1c"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
