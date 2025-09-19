@@ -3,6 +3,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'nutritional_lookup_page.dart';
+
 class BolusPage extends StatefulWidget {
   final ValueListenable<int>? refreshTick;
   const BolusPage({super.key, this.refreshTick});
@@ -33,7 +35,6 @@ class _BolusPageState extends State<BolusPage> {
   double? _carbBolus;
   double? _corrBolus;
   double? _totalBolus;
-  double? _corrNoTrend;
   double? _corrTrendComponent;
 
   void _reset() {
@@ -124,7 +125,6 @@ class _BolusPageState extends State<BolusPage> {
 
     double carbBolus = 0.0;
     double corrBolus = 0.0; // display-only: base correction without trend
-    double corrNoTrend = 0.0;
     double corrTrendComponent = 0.0;
 
     // Carb bolus (requires I:C ratio)
@@ -152,13 +152,13 @@ class _BolusPageState extends State<BolusPage> {
       }
       const toleranceMgdl = 1.0; // treat near-equal as equal due to rounding
       final deltaNo = currentMgdl - target;
-      corrNoTrend = (deltaNo.abs() <= toleranceMgdl) ? 0.0 : (deltaNo / isf);
+      final corrNoTrend = (deltaNo.abs() <= toleranceMgdl) ? 0.0 : (deltaNo / isf);
       final trendAdjUnits = _trendCorrectionUnits(_cgmManufacturer, _selectedTrend);
       corrTrendComponent = trendAdjUnits;
       corrBolus = corrNoTrend; // do not include trend in displayed correction
     }
 
-    double total = carbBolus + corrNoTrend + corrTrendComponent; // include trend only in total
+    double total = carbBolus + corrBolus + corrTrendComponent; // include trend only in total
     if (total < 0) total = 0; // clamp for safety
 
     double roundTo(double value, double step) => (value / step).round() * step;
@@ -168,7 +168,6 @@ class _BolusPageState extends State<BolusPage> {
       _carbBolus = carbBolus;
       _corrBolus = corrBolus;
       _totalBolus = roundedTotal;
-      _corrNoTrend = corrNoTrend;
       _corrTrendComponent = corrTrendComponent;
     });
 
@@ -267,13 +266,15 @@ class _BolusPageState extends State<BolusPage> {
             TextButton(
               onPressed: () async {
                 // Reset to defaults
+                final navigator = Navigator.of(context);
                 final prefs = await SharedPreferences.getInstance();
                 for (final t in tokens) {
                   _trendOverrides[t] = _defaultTrendUnits(t);
                   await prefs.setDouble(_trendPrefKey(t), _trendOverrides[t]!);
                 }
+                if (!mounted || !navigator.mounted) return;
                 setState(() {});
-                Navigator.of(context).pop();
+                navigator.pop();
               },
               child: const Text('Reset Defaults'),
             ),
@@ -283,6 +284,7 @@ class _BolusPageState extends State<BolusPage> {
             ),
             ElevatedButton(
               onPressed: () async {
+                final navigator = Navigator.of(context);
                 final prefs = await SharedPreferences.getInstance();
                 for (final t in tokens) {
                   final raw = controllers[t]?.text.trim().replaceAll(',', '.');
@@ -292,8 +294,9 @@ class _BolusPageState extends State<BolusPage> {
                     await prefs.setDouble(_trendPrefKey(t), v);
                   }
                 }
+                if (!mounted || !navigator.mounted) return;
                 setState(() {});
-                Navigator.of(context).pop();
+                navigator.pop();
               },
               child: const Text('Save'),
             ),
@@ -358,7 +361,7 @@ class _BolusPageState extends State<BolusPage> {
                     ? [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))]
                     : [FilteringTextInputFormatter.digitsOnly],
                 decoration: InputDecoration(
-                  labelText: 'Glucose level (${_glucoseUnit})',
+                  labelText: 'Glucose level ($_glucoseUnit)',
                   hintText: isMmol ? 'e.g. 6.1' : 'e.g. 140',
                   prefixIcon: const Icon(Icons.bloodtype_outlined),
                 ),
@@ -421,7 +424,9 @@ class _BolusPageState extends State<BolusPage> {
                 height: 48,
                 child: OutlinedButton(
                   onPressed: () {
-                    Navigator.of(context).pushNamed('/lookup/nutrition');
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const NutritionalLookupPage()),
+                    );
                   },
                   child: const Text('Nutritional Lookup'),
                 ),
