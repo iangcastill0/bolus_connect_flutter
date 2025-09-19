@@ -3,8 +3,13 @@ import 'screens/welcome_page.dart';
 import 'screens/login_page.dart';
 import 'screens/disclaimer_page.dart';
 import 'screens/home_page.dart';
+import 'screens/main_tabs_page.dart';
+import 'screens/auth_gate.dart';
+import 'screens/bolus_parameters_page.dart';
+import 'screens/nutritional_lookup_page.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'firebase_options.dart';
 
 Future<void> main() async {
@@ -13,6 +18,10 @@ Future<void> main() async {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
+    // Ensure web sessions persist across refresh/close
+    if (kIsWeb) {
+      await FirebaseAuth.instance.setPersistence(Persistence.LOCAL);
+    }
   } catch (e, st) {
     if (kDebugMode) {
       // Log but don't crash the app; login will show a helpful message.
@@ -49,13 +58,16 @@ class MyApp extends StatelessWidget {
         // tested with just a hot reload.
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
       ),
-      // Start on the Welcome page before login
-      initialRoute: '/welcome',
+      // Use an auth gate so signed-in users stay signed in
+      home: const AuthGate(),
       routes: {
         '/welcome': (context) => const WelcomePage(),
         '/login': (context) => const LoginPage(),
         '/disclaimer': (context) => const DisclaimerPage(),
-        '/home': (context) => const HomePage(),
+        // After login, show the 4-tab scaffold
+        '/home': (context) => const MainTabsPage(),
+        '/settings/bolus-parameters': (context) => const BolusParametersPage(),
+        '/lookup/nutrition': (context) => const NutritionalLookupPage(),
       },
     );
   }

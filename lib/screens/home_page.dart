@@ -8,21 +8,7 @@ class HomePage extends StatelessWidget {
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Home'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            tooltip: 'Sign out',
-            onPressed: () async {
-              await FirebaseAuth.instance.signOut();
-              if (context.mounted) {
-                Navigator.of(context).pushNamedAndRemoveUntil('/login', (r) => false);
-              }
-            },
-          ),
-        ],
-      ),
+      appBar: AppBar(title: const Text('Home')),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -36,4 +22,3 @@ class HomePage extends StatelessWidget {
     );
   }
 }
-
