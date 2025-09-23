@@ -15,6 +15,7 @@ class MainTabsPage extends StatefulWidget {
 class _MainTabsPageState extends State<MainTabsPage> {
   int _index = 0;
   final ValueNotifier<int> _bolusRefreshTick = ValueNotifier<int>(0);
+  final ValueNotifier<int> _logsRefreshTick = ValueNotifier<int>(0);
 
   late final List<Widget> _pages;
 
@@ -23,10 +24,17 @@ class _MainTabsPageState extends State<MainTabsPage> {
     super.initState();
     _pages = [
       const HomePage(),
-      const LogsPage(),
-      BolusPage(refreshTick: _bolusRefreshTick),
+      LogsPage(refreshTick: _logsRefreshTick),
+      BolusPage(refreshTick: _bolusRefreshTick, logRefreshTick: _logsRefreshTick),
       const SettingsPage(),
     ];
+  }
+
+  @override
+  void dispose() {
+    _bolusRefreshTick.dispose();
+    _logsRefreshTick.dispose();
+    super.dispose();
   }
 
   @override

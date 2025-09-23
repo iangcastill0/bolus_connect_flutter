@@ -1,13 +1,17 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 
-import 'nutritional_lookup_page.dart';
+import '../services/bolus_log_service.dart';
 
 class BolusPage extends StatefulWidget {
   final ValueListenable<int>? refreshTick;
-  const BolusPage({super.key, this.refreshTick});
+  final ValueNotifier<int>? logRefreshTick;
+  const BolusPage({super.key, this.refreshTick, this.logRefreshTick});
 
   @override
   State<BolusPage> createState() => _BolusPageState();
@@ -36,6 +40,20 @@ class _BolusPageState extends State<BolusPage> {
   double? _corrBolus;
   double? _totalBolus;
   double? _corrTrendComponent;
+
+  Future<void> _openChatGpt() async {
+    final uri = Uri.parse('https://chatgpt.com/');
+    final launched = await launchUrl(
+      uri,
+      mode: LaunchMode.inAppBrowserView,
+      webViewConfiguration: const WebViewConfiguration(enableJavaScript: true),
+    );
+    if (!launched && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to open ChatGPT.')),
+      );
+    }
+  }
 
   void _reset() {
     FocusScope.of(context).unfocus();
@@ -170,6 +188,23 @@ class _BolusPageState extends State<BolusPage> {
       _totalBolus = roundedTotal;
       _corrTrendComponent = corrTrendComponent;
     });
+
+    final trimmedNotes = _notesController.text.trim();
+    final entry = BolusLogEntry(
+      timestamp: DateTime.now(),
+      glucose: gInput,
+      glucoseUnit: _glucoseUnit,
+      carbs: carbs,
+      carbBolus: carbBolus,
+      correctionBolus: corrBolus,
+      trendAdjustment: corrTrendComponent,
+      totalBolus: roundedTotal,
+      notes: trimmedNotes.isEmpty ? null : trimmedNotes,
+    );
+    unawaited(BolusLogService.addEntry(entry));
+    if (widget.logRefreshTick != null) {
+      widget.logRefreshTick!.value++;
+    }
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Bolus calculated')),
@@ -423,11 +458,7 @@ class _BolusPageState extends State<BolusPage> {
               SizedBox(
                 height: 48,
                 child: OutlinedButton(
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const NutritionalLookupPage()),
-                    );
-                  },
+                  onPressed: _openChatGpt,
                   child: const Text('Nutritional Lookup'),
                 ),
               ),
