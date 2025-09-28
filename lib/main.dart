@@ -5,6 +5,7 @@ import 'screens/disclaimer_page.dart';
 import 'screens/main_tabs_page.dart';
 import 'screens/auth_gate.dart';
 import 'screens/bolus_parameters_page.dart';
+import 'screens/pain_area_questionnaire_page.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -65,6 +66,7 @@ class MyApp extends StatelessWidget {
         // After login, show the 4-tab scaffold
         '/home': (context) => const MainTabsPage(),
         '/settings/bolus-parameters': (context) => const BolusParametersPage(),
+        '/questionnaire/pain': (context) => const PainAreaQuestionnairePage(),
       },
     );
   }
