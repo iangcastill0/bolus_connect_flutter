@@ -23,7 +23,6 @@ class HealthQuestionnaireResult {
     required this.weightKg,
     required this.smokes,
     required this.drinksAlcohol,
-    required this.painAreaIds,
     required this.stressLevel,
     required this.completedAt,
     required this.updatedAt,
@@ -38,122 +37,12 @@ class HealthQuestionnaireResult {
   final double weightKg;
   final bool smokes;
   final bool drinksAlcohol;
-  final Set<String> painAreaIds;
   final int stressLevel;
   final DateTime completedAt;
   final DateTime updatedAt;
   final DateTime? lastSyncedAt;
   final Map<String, dynamic> answers;
 }
-
-enum _BodySide { front, back }
-
-class _BodyRegionDefinition {
-  const _BodyRegionDefinition({
-    required this.id,
-    required this.label,
-    required this.side,
-    required this.area,
-  });
-
-  final String id;
-  final String label;
-  final _BodySide side;
-  final Rect area; // Normalized Rect (0-1) bounds relative to figure canvas.
-}
-
-const List<_BodyRegionDefinition> _bodyRegions = [
-  _BodyRegionDefinition(
-    id: 'front_head',
-    label: 'Head',
-    side: _BodySide.front,
-    area: Rect.fromLTWH(0.37, 0.02, 0.26, 0.15),
-  ),
-  _BodyRegionDefinition(
-    id: 'front_chest',
-    label: 'Chest',
-    side: _BodySide.front,
-    area: Rect.fromLTWH(0.32, 0.17, 0.36, 0.2),
-  ),
-  _BodyRegionDefinition(
-    id: 'front_abdomen',
-    label: 'Abdomen',
-    side: _BodySide.front,
-    area: Rect.fromLTWH(0.32, 0.37, 0.36, 0.18),
-  ),
-  _BodyRegionDefinition(
-    id: 'front_left_arm',
-    label: 'Left Arm',
-    side: _BodySide.front,
-    area: Rect.fromLTWH(0.12, 0.2, 0.18, 0.26),
-  ),
-  _BodyRegionDefinition(
-    id: 'front_right_arm',
-    label: 'Right Arm',
-    side: _BodySide.front,
-    area: Rect.fromLTWH(0.7, 0.2, 0.18, 0.26),
-  ),
-  _BodyRegionDefinition(
-    id: 'front_left_leg',
-    label: 'Left Leg',
-    side: _BodySide.front,
-    area: Rect.fromLTWH(0.36, 0.56, 0.13, 0.36),
-  ),
-  _BodyRegionDefinition(
-    id: 'front_right_leg',
-    label: 'Right Leg',
-    side: _BodySide.front,
-    area: Rect.fromLTWH(0.51, 0.56, 0.13, 0.36),
-  ),
-  _BodyRegionDefinition(
-    id: 'back_head',
-    label: 'Head (back)',
-    side: _BodySide.back,
-    area: Rect.fromLTWH(0.37, 0.02, 0.26, 0.15),
-  ),
-  _BodyRegionDefinition(
-    id: 'back_shoulders',
-    label: 'Upper Back',
-    side: _BodySide.back,
-    area: Rect.fromLTWH(0.32, 0.17, 0.36, 0.18),
-  ),
-  _BodyRegionDefinition(
-    id: 'back_lower_back',
-    label: 'Lower Back',
-    side: _BodySide.back,
-    area: Rect.fromLTWH(0.32, 0.35, 0.36, 0.2),
-  ),
-  _BodyRegionDefinition(
-    id: 'back_left_arm',
-    label: 'Left Arm (back)',
-    side: _BodySide.back,
-    area: Rect.fromLTWH(0.12, 0.2, 0.18, 0.26),
-  ),
-  _BodyRegionDefinition(
-    id: 'back_right_arm',
-    label: 'Right Arm (back)',
-    side: _BodySide.back,
-    area: Rect.fromLTWH(0.7, 0.2, 0.18, 0.26),
-  ),
-  _BodyRegionDefinition(
-    id: 'back_glutes',
-    label: 'Glutes',
-    side: _BodySide.back,
-    area: Rect.fromLTWH(0.32, 0.55, 0.36, 0.16),
-  ),
-  _BodyRegionDefinition(
-    id: 'back_left_leg',
-    label: 'Left Leg (back)',
-    side: _BodySide.back,
-    area: Rect.fromLTWH(0.36, 0.68, 0.13, 0.28),
-  ),
-  _BodyRegionDefinition(
-    id: 'back_right_leg',
-    label: 'Right Leg (back)',
-    side: _BodySide.back,
-    area: Rect.fromLTWH(0.51, 0.68, 0.13, 0.28),
-  ),
-];
 
 class _HealthQuestionnaireFlow extends StatefulWidget {
   const _HealthQuestionnaireFlow({this.initialAnswers});
@@ -180,7 +69,6 @@ class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
   String? _gender;
   bool _smokes = false;
   bool _drinksAlcohol = false;
-  final Set<String> _selectedPainRegions = <String>{};
   int _stressLevel = 5;
 
   int _step = 0;
@@ -189,7 +77,6 @@ class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
     'About you',
     'Measurements',
     'Lifestyle',
-    'Pain areas',
     'Stress check-in',
   ];
 
@@ -253,7 +140,6 @@ class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
                       _buildBasicInfoStep(),
                       _buildMeasurementsStep(),
                       _buildLifestyleStep(),
-                      _buildPainAreasStep(),
                       _buildStressStep(),
                     ],
                   ),
@@ -325,13 +211,6 @@ class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
     final drinksAlcohol = _castToBool(data['drinksAlcohol'] ?? data['drinks']);
     if (drinksAlcohol != null) {
       _drinksAlcohol = drinksAlcohol;
-    }
-
-    final painAreas = data['painAreas'];
-    if (painAreas is Iterable) {
-      _selectedPainRegions
-        ..clear()
-        ..addAll(painAreas.map((e) => e.toString()));
     }
 
     final stressRaw = data['stressLevel'];
@@ -486,56 +365,6 @@ class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
     );
   }
 
-  Widget _buildPainAreasStep() {
-    final theme = Theme.of(context);
-    return SingleChildScrollView(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
-            'Tap on the diagram to mark any areas where you feel pain or discomfort. You can pick multiple spots.',
-            style: theme.textTheme.bodyMedium,
-          ),
-          const SizedBox(height: 16),
-          _BodyPainSelector(
-            selectedRegionIds: _selectedPainRegions,
-            onChanged: (updated) => setState(() {
-              _selectedPainRegions
-                ..clear()
-                ..addAll(updated);
-            }),
-          ),
-          const SizedBox(height: 16),
-          if (_selectedPainRegions.isEmpty)
-            Text(
-              'No areas selected. You can tap Next if you are not experiencing pain.',
-              style: theme.textTheme.bodySmall,
-            )
-          else
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: _selectedPainRegions
-                  .map((id) =>
-                      _bodyRegions.firstWhere((region) => region.id == id))
-                  .map(
-                    (region) => InputChip(
-                      label: Text(region.label),
-                      selected: true,
-                      onDeleted: () {
-                        setState(() {
-                          _selectedPainRegions.remove(region.id);
-                        });
-                      },
-                    ),
-                  )
-                  .toList(),
-            ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildStressStep() {
     final theme = Theme.of(context);
     return Column(
@@ -630,7 +459,6 @@ class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
       'weightKg': weightKg,
       'smokes': _smokes,
       'drinksAlcohol': _drinksAlcohol,
-      'painAreas': _selectedPainRegions.toList(),
       'stressLevel': _stressLevel,
       'completedAt': existingCompletedAt ?? nowIso,
       'updatedAt': nowIso,
@@ -657,7 +485,6 @@ class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
       weightKg: weightKg,
       smokes: _smokes,
       drinksAlcohol: _drinksAlcohol,
-      painAreaIds: Set<String>.from(_selectedPainRegions),
       stressLevel: _stressLevel,
       completedAt: completedAt,
       updatedAt: updatedAt,
@@ -704,246 +531,5 @@ class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
     final month = date.month.toString().padLeft(2, '0');
     final day = date.day.toString().padLeft(2, '0');
     return '${date.year}-$month-$day';
-  }
-}
-
-int _channelFromNormalized(double value) {
-  final scaled = (value * 255).round();
-  if (scaled < 0) return 0;
-  if (scaled > 255) return 255;
-  return scaled;
-}
-
-class _BodyPainSelector extends StatefulWidget {
-  const _BodyPainSelector({
-    required this.selectedRegionIds,
-    required this.onChanged,
-  });
-
-  final Set<String> selectedRegionIds;
-  final ValueChanged<Set<String>> onChanged;
-
-  @override
-  State<_BodyPainSelector> createState() => _BodyPainSelectorState();
-}
-
-class _BodyPainSelectorState extends State<_BodyPainSelector> {
-  _BodySide _side = _BodySide.front;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final regions =
-        _bodyRegions.where((region) => region.side == _side).toList();
-    final baseColor = theme.colorScheme.primary;
-    final outlineColor = theme.colorScheme.onSurfaceVariant;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        SegmentedButton<_BodySide>(
-          segments: const [
-            ButtonSegment(value: _BodySide.front, label: Text('Front')),
-            ButtonSegment(value: _BodySide.back, label: Text('Back')),
-          ],
-          selected: {_side},
-          onSelectionChanged: (selection) =>
-              setState(() => _side = selection.first),
-        ),
-        const SizedBox(height: 16),
-        AspectRatio(
-          aspectRatio: 0.55,
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final size = Size(constraints.maxWidth, constraints.maxHeight);
-              final figureFill = Color.fromARGB(
-                40,
-                _channelFromNormalized(baseColor.r),
-                _channelFromNormalized(baseColor.g),
-                _channelFromNormalized(baseColor.b),
-              );
-              return Stack(
-                children: [
-                  Positioned.fill(
-                    child: CustomPaint(
-                      painter: _BodyFigurePainter(
-                          side: _side,
-                          color: figureFill,
-                          outline: outlineColor),
-                    ),
-                  ),
-                  for (final region in regions)
-                    Positioned(
-                      left: region.area.left * size.width,
-                      top: region.area.top * size.height,
-                      width: region.area.width * size.width,
-                      height: region.area.height * size.height,
-                      child: _BodyRegionTile(
-                        label: region.label,
-                        selected: widget.selectedRegionIds.contains(region.id),
-                        onTap: () => _toggleRegion(region.id),
-                      ),
-                    ),
-                ],
-              );
-            },
-          ),
-        ),
-      ],
-    );
-  }
-
-  void _toggleRegion(String regionId) {
-    final updated = Set<String>.from(widget.selectedRegionIds);
-    if (!updated.add(regionId)) {
-      updated.remove(regionId);
-    }
-    widget.onChanged(updated);
-  }
-}
-
-class _BodyRegionTile extends StatelessWidget {
-  const _BodyRegionTile({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final selectedColor = theme.colorScheme.primaryContainer;
-    final borderColor =
-        theme.colorScheme.primary.withAlpha(selected ? 120 : 50);
-    return Padding(
-      padding: const EdgeInsets.all(4),
-      child: Material(
-        color: selected ? selectedColor : Colors.transparent,
-        borderRadius: BorderRadius.circular(12),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(12),
-          child: Tooltip(
-            message: label,
-            child: AnimatedOpacity(
-              duration: const Duration(milliseconds: 200),
-              opacity: selected ? 1 : 0.65,
-              child: Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
-                  border:
-                      Border.all(color: borderColor, width: selected ? 2 : 1),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _BodyFigurePainter extends CustomPainter {
-  _BodyFigurePainter(
-      {required this.side, required this.color, required this.outline});
-
-  final _BodySide side;
-  final Color color;
-  final Color outline;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paintFill = Paint()
-      ..color = color
-      ..style = PaintingStyle.fill;
-    final paintStroke = Paint()
-      ..color = outline
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2;
-
-    final headRadius = size.width * 0.13;
-    final headCenter = Offset(size.width / 2, headRadius + size.height * 0.02);
-    final headRect = Rect.fromCircle(center: headCenter, radius: headRadius);
-    canvas.drawOval(headRect, paintFill);
-    canvas.drawOval(headRect, paintStroke);
-
-    final torsoTop = headRect.bottom + size.height * 0.02;
-    final torsoBottom = size.height * 0.58;
-    final torsoWidth = size.width * 0.36;
-    final torsoLeft = (size.width - torsoWidth) / 2;
-    final torsoRect =
-        Rect.fromLTRB(torsoLeft, torsoTop, torsoLeft + torsoWidth, torsoBottom);
-    final torsoRRect =
-        RRect.fromRectAndRadius(torsoRect, Radius.circular(size.width * 0.08));
-    canvas.drawRRect(torsoRRect, paintFill);
-    canvas.drawRRect(torsoRRect, paintStroke);
-
-    final hipWidth = size.width * 0.42;
-    final hipHeight = size.height * 0.12;
-    final hipRect = Rect.fromCenter(
-      center: Offset(size.width / 2, torsoBottom + hipHeight / 2),
-      width: hipWidth,
-      height: hipHeight,
-    );
-    final hipRRect =
-        RRect.fromRectAndRadius(hipRect, Radius.circular(size.width * 0.09));
-    canvas.drawRRect(hipRRect, paintFill);
-    canvas.drawRRect(hipRRect, paintStroke);
-
-    final legWidth = size.width * 0.16;
-    final legHeight = size.height - hipRect.bottom;
-    final leftLegRect = Rect.fromLTWH(hipRect.left + size.width * 0.04,
-        hipRect.bottom - size.height * 0.01, legWidth, legHeight);
-    final rightLegRect = Rect.fromLTWH(
-        hipRect.right - legWidth - size.width * 0.04,
-        hipRect.bottom - size.height * 0.01,
-        legWidth,
-        legHeight);
-    final legRRectRadius = Radius.circular(size.width * 0.08);
-    canvas.drawRRect(
-        RRect.fromRectAndRadius(leftLegRect, legRRectRadius), paintFill);
-    canvas.drawRRect(
-        RRect.fromRectAndRadius(rightLegRect, legRRectRadius), paintFill);
-    canvas.drawRRect(
-        RRect.fromRectAndRadius(leftLegRect, legRRectRadius), paintStroke);
-    canvas.drawRRect(
-        RRect.fromRectAndRadius(rightLegRect, legRRectRadius), paintStroke);
-
-    final armWidth = size.width * 0.14;
-    final armHeight = size.height * 0.32;
-    final armTop = torsoTop + size.height * 0.08;
-    final leftArmRect = Rect.fromLTWH(
-        torsoRect.left - armWidth - size.width * 0.02,
-        armTop,
-        armWidth,
-        armHeight);
-    final rightArmRect = Rect.fromLTWH(
-        torsoRect.right + size.width * 0.02, armTop, armWidth, armHeight);
-    final armRadius = Radius.circular(size.width * 0.07);
-    canvas.drawRRect(
-        RRect.fromRectAndRadius(leftArmRect, armRadius), paintFill);
-    canvas.drawRRect(
-        RRect.fromRectAndRadius(rightArmRect, armRadius), paintFill);
-    canvas.drawRRect(
-        RRect.fromRectAndRadius(leftArmRect, armRadius), paintStroke);
-    canvas.drawRRect(
-        RRect.fromRectAndRadius(rightArmRect, armRadius), paintStroke);
-
-    if (side == _BodySide.back) {
-      final spinePath = Path()
-        ..moveTo(size.width / 2, torsoTop + size.height * 0.04)
-        ..lineTo(size.width / 2, torsoBottom - size.height * 0.04);
-      canvas.drawPath(spinePath, paintStroke);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _BodyFigurePainter oldDelegate) {
-    return oldDelegate.side != side ||
-        oldDelegate.color != color ||
-        oldDelegate.outline != outline;
   }
 }

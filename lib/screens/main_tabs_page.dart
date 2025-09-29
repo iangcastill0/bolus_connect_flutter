@@ -20,6 +20,10 @@ class _MainTabsPageState extends State<MainTabsPage> {
   int _index = 0;
   final ValueNotifier<int> _bolusRefreshTick = ValueNotifier<int>(0);
   final ValueNotifier<int> _logsRefreshTick = ValueNotifier<int>(0);
+  final GlobalKey<SettingsPageState> _settingsPageKey =
+      GlobalKey<SettingsPageState>();
+  bool _openedBolusAfterProfile = false;
+  bool _promptHandledThisSession = false;
 
   late final List<Widget> _pages;
 
@@ -31,7 +35,7 @@ class _MainTabsPageState extends State<MainTabsPage> {
       LogsPage(refreshTick: _logsRefreshTick),
       BolusPage(
           refreshTick: _bolusRefreshTick, logRefreshTick: _logsRefreshTick),
-      const SettingsPage(),
+      SettingsPage(key: _settingsPageKey),
     ];
     WidgetsBinding.instance
         .addPostFrameCallback((_) => _maybePromptQuestionnaire());
@@ -80,6 +84,7 @@ class _MainTabsPageState extends State<MainTabsPage> {
 
   Future<void> _maybePromptQuestionnaire() async {
     if (!mounted) return;
+    if (_promptHandledThisSession) return;
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
@@ -106,7 +111,16 @@ class _MainTabsPageState extends State<MainTabsPage> {
       userId: user.uid,
       answers: result.answers,
     );
+    _settingsPageKey.currentState?.refreshProfile();
     if (!mounted) return;
+
+    _promptHandledThisSession = true;
+
+    if (!_openedBolusAfterProfile) {
+      _openedBolusAfterProfile = true;
+      await Navigator.of(context).pushNamed('/settings/bolus-parameters');
+      if (!mounted) return;
+    }
 
     final theme = Theme.of(context);
     ScaffoldMessenger.of(context).showSnackBar(

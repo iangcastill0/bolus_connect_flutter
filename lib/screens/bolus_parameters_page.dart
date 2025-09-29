@@ -16,8 +16,8 @@ class _BolusParametersPageState extends State<BolusParametersPage> {
   final _targetController = TextEditingController();
   final _isfController = TextEditingController();
 
-  final List<String> _cgmOptions = const ['Dexcom', 'Freestyle Libre'];
-  String? _selectedCgm;
+  final List<String> _cgmOptions = const ['None', 'Dexcom', 'Freestyle Libre'];
+  String _selectedCgm = '';
   String _glucoseUnit = 'mg/dL'; // or 'mmol/L'
   bool _loading = true;
 
@@ -41,15 +41,19 @@ class _BolusParametersPageState extends State<BolusParametersPage> {
     final targetMgdl = _parseDouble(prefs.getString('targetGlucose'));
     final isfMgdl = _parseDouble(prefs.getString('isf'));
     setState(() {
-      _selectedCgm = prefs.getString('cgmManufacturer');
+      _selectedCgm = prefs.getString('cgmManufacturer') ?? '';
       _glucoseUnit = unit;
       _icController.text = prefs.getString('icRatio') ?? '';
       _targetController.text = targetMgdl == null
           ? ''
-          : (unit == 'mmol/L' ? _formatMmol(_mgdlToMmol(targetMgdl)) : _formatMgdl(targetMgdl));
+          : (unit == 'mmol/L'
+              ? _formatMmol(_mgdlToMmol(targetMgdl))
+              : _formatMgdl(targetMgdl));
       _isfController.text = isfMgdl == null
           ? ''
-          : (unit == 'mmol/L' ? _formatMmol(_mgdlToMmol(isfMgdl)) : _formatMgdl(isfMgdl));
+          : (unit == 'mmol/L'
+              ? _formatMmol(_mgdlToMmol(isfMgdl))
+              : _formatMgdl(isfMgdl));
       _loading = false;
     });
   }
@@ -69,13 +73,15 @@ class _BolusParametersPageState extends State<BolusParametersPage> {
     // Parse inputs in current unit
     final target = _parseDouble(_targetController.text);
     final isf = _parseDouble(_isfController.text);
-    if (target == null || isf == null) return; // safeguard; validators should prevent this
+    if (target == null || isf == null) {
+      return; // safeguard; validators should prevent this
+    }
 
     // Convert to canonical mg/dL for storage
     final targetMgdl = _glucoseUnit == 'mmol/L' ? _mmolToMgdl(target) : target;
     final isfMgdl = _glucoseUnit == 'mmol/L' ? _mmolToMgdl(isf) : isf;
 
-    await prefs.setString('cgmManufacturer', _selectedCgm ?? '');
+    await prefs.setString('cgmManufacturer', _selectedCgm);
     await prefs.setString('icRatio', _icController.text.trim());
     await prefs.setString('glucoseUnit', _glucoseUnit);
     await prefs.setString('targetGlucose', _formatMgdl(targetMgdl));
@@ -84,6 +90,7 @@ class _BolusParametersPageState extends State<BolusParametersPage> {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Bolus parameters saved')),
     );
+    Navigator.of(context).maybePop();
   }
 
   // Helpers
@@ -105,11 +112,19 @@ class _BolusParametersPageState extends State<BolusParametersPage> {
     final isf = _parseDouble(_isfController.text);
     setState(() {
       if (unit == 'mmol/L') {
-        if (target != null) _targetController.text = _formatMmol(_mgdlToMmol(target));
-        if (isf != null) _isfController.text = _formatMmol(_mgdlToMmol(isf));
+        if (target != null) {
+          _targetController.text = _formatMmol(_mgdlToMmol(target));
+        }
+        if (isf != null) {
+          _isfController.text = _formatMmol(_mgdlToMmol(isf));
+        }
       } else {
-        if (target != null) _targetController.text = _formatMgdl(_mmolToMgdl(target));
-        if (isf != null) _isfController.text = _formatMgdl(_mmolToMgdl(isf));
+        if (target != null) {
+          _targetController.text = _formatMgdl(_mmolToMgdl(target));
+        }
+        if (isf != null) {
+          _isfController.text = _formatMgdl(_mmolToMgdl(isf));
+        }
       }
       _glucoseUnit = unit;
     });
@@ -137,17 +152,18 @@ class _BolusParametersPageState extends State<BolusParametersPage> {
                 DropdownButtonFormField<String>(
                   value: _selectedCgm,
                   items: _cgmOptions
-                      .map((e) => DropdownMenuItem<String>(value: e, child: Text(e)))
+                      .map((option) => DropdownMenuItem<String>(
+                            value: option == 'None' ? '' : option,
+                            child: Text(option),
+                          ))
                       .toList(),
-                  onChanged: (v) => setState(() => _selectedCgm = v),
+                  onChanged: (v) => setState(() => _selectedCgm = v ?? ''),
                   decoration: const InputDecoration(
                     labelText: 'CGM manufacturer',
                     prefixIcon: Icon(Icons.monitor_heart_outlined),
                   ),
-                  validator: (v) => (v == null || v.isEmpty) ? 'Select a CGM' : null,
                 ),
                 const SizedBox(height: 16),
-
                 DropdownButtonFormField<String>(
                   value: _glucoseUnit,
                   items: const [
@@ -161,11 +177,13 @@ class _BolusParametersPageState extends State<BolusParametersPage> {
                   ),
                 ),
                 const SizedBox(height: 16),
-
                 TextFormField(
                   controller: _icController,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))
+                  ],
                   decoration: const InputDecoration(
                     labelText: 'I:C ratio (g/U)',
                     hintText: 'e.g. 15',
@@ -174,7 +192,6 @@ class _BolusParametersPageState extends State<BolusParametersPage> {
                   validator: (v) => _validatePositive(v, 'I:C ratio'),
                 ),
                 const SizedBox(height: 16),
-
                 TextFormField(
                   controller: _targetController,
                   keyboardType: _glucoseUnit == 'mmol/L'
@@ -185,17 +202,20 @@ class _BolusParametersPageState extends State<BolusParametersPage> {
                       : [FilteringTextInputFormatter.digitsOnly],
                   decoration: InputDecoration(
                     labelText: 'Target glucose (${_glucoseUnit})',
-                    hintText: _glucoseUnit == 'mmol/L' ? 'e.g. 6.1' : 'e.g. 110',
+                    hintText:
+                        _glucoseUnit == 'mmol/L' ? 'e.g. 6.1' : 'e.g. 110',
                     prefixIcon: const Icon(Icons.bloodtype_outlined),
                   ),
                   validator: (v) => _validatePositive(v, 'Target glucose'),
                 ),
                 const SizedBox(height: 16),
-
                 TextFormField(
                   controller: _isfController,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))
+                  ],
                   decoration: InputDecoration(
                     labelText: 'ISF (${_glucoseUnit} per U)',
                     hintText: _glucoseUnit == 'mmol/L' ? 'e.g. 2.8' : 'e.g. 50',
@@ -204,7 +224,6 @@ class _BolusParametersPageState extends State<BolusParametersPage> {
                   validator: (v) => _validatePositive(v, 'ISF'),
                 ),
                 const SizedBox(height: 24),
-
                 SizedBox(
                   height: 48,
                   child: ElevatedButton.icon(

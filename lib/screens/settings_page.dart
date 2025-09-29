@@ -9,10 +9,10 @@ class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
 
   @override
-  State<SettingsPage> createState() => _SettingsPageState();
+  SettingsPageState createState() => SettingsPageState();
 }
 
-class _SettingsPageState extends State<SettingsPage> {
+class SettingsPageState extends State<SettingsPage> {
   Future<Map<String, dynamic>?>? _profileFuture;
 
   @override
@@ -27,7 +27,7 @@ class _SettingsPageState extends State<SettingsPage> {
     return HealthQuestionnaireService.loadAnswersForUser(user.uid);
   }
 
-  Future<void> _refreshProfile() async {
+  Future<void> refreshProfile() async {
     setState(() {
       _profileFuture = _loadProfile();
     });
@@ -72,7 +72,7 @@ class _SettingsPageState extends State<SettingsPage> {
       );
     } finally {
       if (mounted) {
-        await _refreshProfile();
+        await refreshProfile();
       }
     }
   }

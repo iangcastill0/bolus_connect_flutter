@@ -3,10 +3,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../services/bolus_log_service.dart';
+
+enum _NutritionalLookupOption { chatGpt, camera }
 
 class BolusPage extends StatefulWidget {
   final ValueListenable<int>? refreshTick;
@@ -41,7 +44,47 @@ class _BolusPageState extends State<BolusPage> {
   double? _totalBolus;
   double? _corrTrendComponent;
 
-  Future<void> _openChatGpt() async {
+  final ImagePicker _imagePicker = ImagePicker();
+
+  Future<void> _handleNutritionalLookup() async {
+    if (!mounted) return;
+    final option = await showModalBottomSheet<_NutritionalLookupOption>(
+      context: context,
+      builder: (context) {
+        return SafeArea(
+          child: Wrap(
+            children: [
+              ListTile(
+                leading: const Icon(Icons.chat_outlined),
+                title: const Text('ChatGPT'),
+                onTap: () =>
+                    Navigator.of(context).pop(_NutritionalLookupOption.chatGpt),
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_camera_outlined),
+                title: const Text('Camera'),
+                onTap: () =>
+                    Navigator.of(context).pop(_NutritionalLookupOption.camera),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (!mounted || option == null) return;
+
+    switch (option) {
+      case _NutritionalLookupOption.chatGpt:
+        await _launchChatGpt();
+        break;
+      case _NutritionalLookupOption.camera:
+        _launchCameraLookup();
+        break;
+    }
+  }
+
+  Future<void> _launchChatGpt() async {
     final uri = Uri.parse('https://chatgpt.com/');
     final launched = await launchUrl(
       uri,
@@ -51,6 +94,30 @@ class _BolusPageState extends State<BolusPage> {
     if (!launched && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Unable to open ChatGPT.')),
+      );
+    }
+  }
+
+  Future<void> _launchCameraLookup() async {
+    try {
+      final XFile? capture =
+          await _imagePicker.pickImage(source: ImageSource.camera);
+      if (!mounted) return;
+      if (capture == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Camera closed without capturing.')),
+        );
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Photo captured: ${capture.name}')),
+      );
+      // TODO(iangcastillo): send image to nutrition analysis service.
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Unable to access camera: $e')),
       );
     }
   }
@@ -95,7 +162,8 @@ class _BolusPageState extends State<BolusPage> {
 
   Future<void> _loadPrefs() async {
     final prefs = await SharedPreferences.getInstance();
-    double? parseNum(String? s) => s == null ? null : double.tryParse(s.trim().replaceAll(',', '.'));
+    double? parseNum(String? s) =>
+        s == null ? null : double.tryParse(s.trim().replaceAll(',', '.'));
     final ic = parseNum(prefs.getString('icRatio'));
     final target = parseNum(prefs.getString('targetGlucose'));
     final isf = parseNum(prefs.getString('isf'));
@@ -105,17 +173,29 @@ class _BolusPageState extends State<BolusPage> {
       _icRatio = ic;
       _targetMgdl = target;
       _isfMgdl = isf;
-      _paramsAvailable = ic != null && ic > 0 && target != null && target > 0 && isf != null && isf > 0;
+      _paramsAvailable = ic != null &&
+          ic > 0 &&
+          target != null &&
+          target > 0 &&
+          isf != null &&
+          isf > 0;
       _loading = false;
     });
     // Load trend overrides (use defaults if absent)
-    _trendOverrides['↑↑'] = prefs.getDouble(_trendPrefKey('↑↑')) ?? _defaultTrendUnits('↑↑');
-    _trendOverrides['↑'] = prefs.getDouble(_trendPrefKey('↑')) ?? _defaultTrendUnits('↑');
-    _trendOverrides['↗'] = prefs.getDouble(_trendPrefKey('↗')) ?? _defaultTrendUnits('↗');
-    _trendOverrides['→'] = prefs.getDouble(_trendPrefKey('→')) ?? _defaultTrendUnits('→');
-    _trendOverrides['↘'] = prefs.getDouble(_trendPrefKey('↘')) ?? _defaultTrendUnits('↘');
-    _trendOverrides['↓'] = prefs.getDouble(_trendPrefKey('↓')) ?? _defaultTrendUnits('↓');
-    _trendOverrides['↓↓'] = prefs.getDouble(_trendPrefKey('↓↓')) ?? _defaultTrendUnits('↓↓');
+    _trendOverrides['↑↑'] =
+        prefs.getDouble(_trendPrefKey('↑↑')) ?? _defaultTrendUnits('↑↑');
+    _trendOverrides['↑'] =
+        prefs.getDouble(_trendPrefKey('↑')) ?? _defaultTrendUnits('↑');
+    _trendOverrides['↗'] =
+        prefs.getDouble(_trendPrefKey('↗')) ?? _defaultTrendUnits('↗');
+    _trendOverrides['→'] =
+        prefs.getDouble(_trendPrefKey('→')) ?? _defaultTrendUnits('→');
+    _trendOverrides['↘'] =
+        prefs.getDouble(_trendPrefKey('↘')) ?? _defaultTrendUnits('↘');
+    _trendOverrides['↓'] =
+        prefs.getDouble(_trendPrefKey('↓')) ?? _defaultTrendUnits('↓');
+    _trendOverrides['↓↓'] =
+        prefs.getDouble(_trendPrefKey('↓↓')) ?? _defaultTrendUnits('↓↓');
   }
 
   String? _validateOptionalPositive(String? v, String field) {
@@ -130,13 +210,15 @@ class _BolusPageState extends State<BolusPage> {
     if (form == null) return;
     if (!form.validate()) return;
 
-    double? parseNum(String? s) => s == null ? null : double.tryParse(s.trim().replaceAll(',', '.'));
+    double? parseNum(String? s) =>
+        s == null ? null : double.tryParse(s.trim().replaceAll(',', '.'));
     final carbs = parseNum(_carbsController.text);
     final gInput = parseNum(_glucoseController.text);
 
     if (carbs == null && gInput == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Enter glucose or carbohydrates to calculate.')),
+        const SnackBar(
+            content: Text('Enter glucose or carbohydrates to calculate.')),
       );
       return;
     }
@@ -150,7 +232,8 @@ class _BolusPageState extends State<BolusPage> {
       final ic = _icRatio;
       if (ic == null || ic <= 0) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Set your I:C ratio in Bolus parameters.')),
+          const SnackBar(
+              content: Text('Set your I:C ratio in Bolus parameters.')),
         );
         return;
       }
@@ -164,19 +247,24 @@ class _BolusPageState extends State<BolusPage> {
       final isf = _isfMgdl;
       if (target == null || target <= 0 || isf == null || isf <= 0) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Set your Target and ISF in Bolus parameters.')),
+          const SnackBar(
+              content: Text('Set your Target and ISF in Bolus parameters.')),
         );
         return;
       }
       const toleranceMgdl = 1.0; // treat near-equal as equal due to rounding
       final deltaNo = currentMgdl - target;
-      final corrNoTrend = (deltaNo.abs() <= toleranceMgdl) ? 0.0 : (deltaNo / isf);
-      final trendAdjUnits = _trendCorrectionUnits(_cgmManufacturer, _selectedTrend);
+      final corrNoTrend =
+          (deltaNo.abs() <= toleranceMgdl) ? 0.0 : (deltaNo / isf);
+      final trendAdjUnits =
+          _trendCorrectionUnits(_cgmManufacturer, _selectedTrend);
       corrTrendComponent = trendAdjUnits;
       corrBolus = corrNoTrend; // do not include trend in displayed correction
     }
 
-    double total = carbBolus + corrBolus + corrTrendComponent; // include trend only in total
+    double total = carbBolus +
+        corrBolus +
+        corrTrendComponent; // include trend only in total
     if (total < 0) total = 0; // clamp for safety
 
     double roundTo(double value, double step) => (value / step).round() * step;
@@ -275,20 +363,30 @@ class _BolusPageState extends State<BolusPage> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Edit the units added to correction for each arrow:'),
+                const Text(
+                    'Edit the units added to correction for each arrow:'),
                 const SizedBox(height: 12),
                 ...tokens.map((t) => Padding(
                       padding: const EdgeInsets.symmetric(vertical: 6),
                       child: Row(
                         children: [
-                          SizedBox(width: 32, child: Text(t, style: const TextStyle(fontSize: 16))),
+                          SizedBox(
+                              width: 32,
+                              child: Text(t,
+                                  style: const TextStyle(fontSize: 16))),
                           const SizedBox(width: 12),
                           Expanded(
                             child: TextField(
                               controller: controllers[t],
-                              keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
-                              inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9+\-.,]'))],
-                              decoration: const InputDecoration(suffixText: 'U', hintText: 'e.g. 0.50'),
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(
+                                      decimal: true, signed: true),
+                              inputFormatters: [
+                                FilteringTextInputFormatter.allow(
+                                    RegExp(r'[0-9+\-.,]'))
+                              ],
+                              decoration: const InputDecoration(
+                                  suffixText: 'U', hintText: 'e.g. 0.50'),
                             ),
                           ),
                         ],
@@ -372,10 +470,13 @@ class _BolusPageState extends State<BolusPage> {
                 Card(
                   color: Theme.of(context).colorScheme.errorContainer,
                   child: ListTile(
-                    leading: Icon(Icons.info_outline, color: Theme.of(context).colorScheme.onErrorContainer),
+                    leading: Icon(Icons.info_outline,
+                        color: Theme.of(context).colorScheme.onErrorContainer),
                     title: Text(
                       'Set your Bolus parameters (I:C, Target, ISF) for accurate calculations.',
-                      style: TextStyle(color: Theme.of(context).colorScheme.onErrorContainer),
+                      style: TextStyle(
+                          color:
+                              Theme.of(context).colorScheme.onErrorContainer),
                     ),
                     trailing: TextButton(
                       onPressed: () => Navigator.of(context)
@@ -406,7 +507,8 @@ class _BolusPageState extends State<BolusPage> {
                 const SizedBox(height: 8),
                 Row(
                   children: [
-                    Text('Trend', style: Theme.of(context).textTheme.labelLarge),
+                    Text('Trend',
+                        style: Theme.of(context).textTheme.labelLarge),
                     const SizedBox(width: 8),
                     IconButton(
                       icon: const Icon(Icons.info_outline),
@@ -424,7 +526,8 @@ class _BolusPageState extends State<BolusPage> {
                     return ChoiceChip(
                       label: Text(t, style: const TextStyle(fontSize: 16)),
                       selected: selected,
-                      onSelected: (v) => setState(() => _selectedTrend = v ? t : null),
+                      onSelected: (v) =>
+                          setState(() => _selectedTrend = v ? t : null),
                     );
                   }).toList(),
                 ),
@@ -432,8 +535,11 @@ class _BolusPageState extends State<BolusPage> {
               const SizedBox(height: 16),
               TextFormField(
                 controller: _carbsController,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))
+                ],
                 decoration: const InputDecoration(
                   labelText: 'Carbohydrates (g)',
                   hintText: 'e.g. 45',
@@ -451,14 +557,15 @@ class _BolusPageState extends State<BolusPage> {
                   hintText: 'Add meal details, activity, etc.',
                   isDense: true,
                   alignLabelWithHint: true,
-                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  contentPadding:
+                      EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 ),
               ),
               const SizedBox(height: 8),
               SizedBox(
                 height: 48,
                 child: OutlinedButton(
-                  onPressed: _openChatGpt,
+                  onPressed: _handleNutritionalLookup,
                   child: const Text('Nutritional Lookup'),
                 ),
               ),
@@ -479,7 +586,8 @@ class _BolusPageState extends State<BolusPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Result', style: Theme.of(context).textTheme.titleMedium),
+                        Text('Result',
+                            style: Theme.of(context).textTheme.titleMedium),
                         const SizedBox(height: 8),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -501,7 +609,8 @@ class _BolusPageState extends State<BolusPage> {
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Text('Trend correction (${_selectedTrend!})'),
-                              Text('${(_corrTrendComponent ?? 0).toStringAsFixed(2)} U'),
+                              Text(
+                                  '${(_corrTrendComponent ?? 0).toStringAsFixed(2)} U'),
                             ],
                           ),
                         ],
@@ -509,8 +618,11 @@ class _BolusPageState extends State<BolusPage> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Text('Recommended total', style: TextStyle(fontWeight: FontWeight.w600)),
-                            Text('${_totalBolus!.toStringAsFixed(1)} U', style: const TextStyle(fontWeight: FontWeight.w600)),
+                            const Text('Recommended total',
+                                style: TextStyle(fontWeight: FontWeight.w600)),
+                            Text('${_totalBolus!.toStringAsFixed(1)} U',
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w600)),
                           ],
                         ),
                         const SizedBox(height: 8),
