@@ -1,0 +1,8 @@
+app_identifier("com.castillo.bolusConnectFlutter") # The bundle identifier of your app
+apple_id("iancastillo790@yahoo.com") # Your Apple Developer Portal username
+
+itc_team_id("126759807") # App Store Connect Team ID
+team_id("2946GBAHU9") # Developer Portal Team ID
+
+# For more information about the Appfile, see:
+#     https://docs.fastlane.tools/advanced/#appfile
