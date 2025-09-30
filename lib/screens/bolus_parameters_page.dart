@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../widgets/keyboard_dismissible.dart';
+
 class BolusParametersPage extends StatefulWidget {
   const BolusParametersPage({super.key});
 
@@ -141,106 +143,109 @@ class _BolusParametersPageState extends State<BolusParametersPage> {
     }
     return Scaffold(
       appBar: AppBar(title: const Text('Bolus Parameters')),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                DropdownButtonFormField<String>(
-                  value: _selectedCgm,
-                  items: _cgmOptions
-                      .map((option) => DropdownMenuItem<String>(
-                            value: option == 'None' ? '' : option,
-                            child: Text(option),
-                          ))
-                      .toList(),
-                  onChanged: (v) => setState(() => _selectedCgm = v ?? ''),
-                  decoration: const InputDecoration(
-                    labelText: 'CGM manufacturer',
-                    prefixIcon: Icon(Icons.monitor_heart_outlined),
+      body: KeyboardDismissible(
+        child: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  DropdownButtonFormField<String>(
+                    value: _selectedCgm,
+                    items: _cgmOptions
+                        .map((option) => DropdownMenuItem<String>(
+                              value: option == 'None' ? '' : option,
+                              child: Text(option),
+                            ))
+                        .toList(),
+                    onChanged: (v) => setState(() => _selectedCgm = v ?? ''),
+                    decoration: const InputDecoration(
+                      labelText: 'CGM manufacturer',
+                      prefixIcon: Icon(Icons.monitor_heart_outlined),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 16),
-                DropdownButtonFormField<String>(
-                  value: _glucoseUnit,
-                  items: const [
-                    DropdownMenuItem(value: 'mg/dL', child: Text('mg/dL')),
-                    DropdownMenuItem(value: 'mmol/L', child: Text('mmol/L')),
-                  ],
-                  onChanged: _onUnitChanged,
-                  decoration: const InputDecoration(
-                    labelText: 'Glucose units',
-                    prefixIcon: Icon(Icons.straighten),
+                  const SizedBox(height: 16),
+                  DropdownButtonFormField<String>(
+                    value: _glucoseUnit,
+                    items: const [
+                      DropdownMenuItem(value: 'mg/dL', child: Text('mg/dL')),
+                      DropdownMenuItem(value: 'mmol/L', child: Text('mmol/L')),
+                    ],
+                    onChanged: _onUnitChanged,
+                    decoration: const InputDecoration(
+                      labelText: 'Glucose units',
+                      prefixIcon: Icon(Icons.straighten),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _icController,
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
-                  inputFormatters: [
-                    FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))
-                  ],
-                  decoration: const InputDecoration(
-                    labelText: 'I:C ratio (g/U)',
-                    hintText: 'e.g. 15',
-                    prefixIcon: Icon(Icons.scale_outlined),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _icController,
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))
+                    ],
+                    decoration: const InputDecoration(
+                      labelText: 'I:C ratio (g/U)',
+                      hintText: 'e.g. 15',
+                      prefixIcon: Icon(Icons.scale_outlined),
+                    ),
+                    validator: (v) => _validatePositive(v, 'I:C ratio'),
                   ),
-                  validator: (v) => _validatePositive(v, 'I:C ratio'),
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _targetController,
-                  keyboardType: _glucoseUnit == 'mmol/L'
-                      ? const TextInputType.numberWithOptions(decimal: true)
-                      : TextInputType.number,
-                  inputFormatters: _glucoseUnit == 'mmol/L'
-                      ? [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))]
-                      : [FilteringTextInputFormatter.digitsOnly],
-                  decoration: InputDecoration(
-                    labelText: 'Target glucose (${_glucoseUnit})',
-                    hintText:
-                        _glucoseUnit == 'mmol/L' ? 'e.g. 6.1' : 'e.g. 110',
-                    prefixIcon: const Icon(Icons.bloodtype_outlined),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _targetController,
+                    keyboardType: _glucoseUnit == 'mmol/L'
+                        ? const TextInputType.numberWithOptions(decimal: true)
+                        : TextInputType.number,
+                    inputFormatters: _glucoseUnit == 'mmol/L'
+                        ? [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))]
+                        : [FilteringTextInputFormatter.digitsOnly],
+                    decoration: InputDecoration(
+                      labelText: 'Target glucose (${_glucoseUnit})',
+                      hintText:
+                          _glucoseUnit == 'mmol/L' ? 'e.g. 6.1' : 'e.g. 110',
+                      prefixIcon: const Icon(Icons.bloodtype_outlined),
+                    ),
+                    validator: (v) => _validatePositive(v, 'Target glucose'),
                   ),
-                  validator: (v) => _validatePositive(v, 'Target glucose'),
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _isfController,
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
-                  inputFormatters: [
-                    FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))
-                  ],
-                  decoration: InputDecoration(
-                    labelText: 'ISF (${_glucoseUnit} per U)',
-                    hintText: _glucoseUnit == 'mmol/L' ? 'e.g. 2.8' : 'e.g. 50',
-                    prefixIcon: const Icon(Icons.local_hospital_outlined),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _isfController,
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))
+                    ],
+                    decoration: InputDecoration(
+                      labelText: 'ISF (${_glucoseUnit} per U)',
+                      hintText:
+                          _glucoseUnit == 'mmol/L' ? 'e.g. 2.8' : 'e.g. 50',
+                      prefixIcon: const Icon(Icons.local_hospital_outlined),
+                    ),
+                    validator: (v) => _validatePositive(v, 'ISF'),
                   ),
-                  validator: (v) => _validatePositive(v, 'ISF'),
-                ),
-                const SizedBox(height: 24),
-                SizedBox(
-                  height: 48,
-                  child: ElevatedButton.icon(
-                    onPressed: _save,
-                    icon: const Icon(Icons.save_outlined),
-                    label: const Text('Save'),
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    height: 48,
+                    child: ElevatedButton.icon(
+                      onPressed: _save,
+                      icon: const Icon(Icons.save_outlined),
+                      label: const Text('Save'),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Values are stored on-device. You can update them anytime.',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.textTheme.bodySmall?.color?.withOpacity(0.7),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Values are stored on-device. You can update them anytime.',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.textTheme.bodySmall?.color?.withOpacity(0.7),
+                    ),
+                    textAlign: TextAlign.center,
                   ),
-                  textAlign: TextAlign.center,
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),

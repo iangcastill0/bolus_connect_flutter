@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../services/bolus_log_service.dart';
+import '../widgets/keyboard_dismissible.dart';
 
 enum _NutritionalLookupOption { chatGpt, camera }
 
@@ -270,6 +271,8 @@ class _BolusPageState extends State<BolusPage> {
     double roundTo(double value, double step) => (value / step).round() * step;
     final roundedTotal = roundTo(total, 0.1);
 
+    FocusScope.of(context).unfocus();
+
     setState(() {
       _carbBolus = carbBolus;
       _corrBolus = corrBolus;
@@ -470,13 +473,15 @@ class _BolusPageState extends State<BolusPage> {
                 Card(
                   color: Theme.of(context).colorScheme.errorContainer,
                   child: ListTile(
-                    leading: Icon(Icons.info_outline,
-                        color: Theme.of(context).colorScheme.onErrorContainer),
+                    leading: Icon(
+                      Icons.info_outline,
+                      color: Theme.of(context).colorScheme.onErrorContainer,
+                    ),
                     title: Text(
                       'Set your Bolus parameters (I:C, Target, ISF) for accurate calculations.',
                       style: TextStyle(
-                          color:
-                              Theme.of(context).colorScheme.onErrorContainer),
+                        color: Theme.of(context).colorScheme.onErrorContainer,
+                      ),
                     ),
                     trailing: TextButton(
                       onPressed: () => Navigator.of(context)
@@ -640,21 +645,29 @@ class _BolusPageState extends State<BolusPage> {
         ),
       ),
     );
-
     return Scaffold(
       appBar: AppBar(title: const Text('Bolus')),
-      body: Stack(
-        children: [
-          content,
-          if (_totalBolus != null)
-            Positioned.fill(
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: _reset,
-                child: const SizedBox.expand(),
+      body: KeyboardDismissible(
+        child: Stack(
+          children: [
+            content,
+            if (_totalBolus != null)
+              Positioned.fill(
+                child: GestureDetector(
+                  behavior: HitTestBehavior.translucent,
+                  onTap: () {
+                    final primaryFocus = FocusManager.instance.primaryFocus;
+                    if (primaryFocus != null) {
+                      primaryFocus.unfocus();
+                      return;
+                    }
+                    _reset();
+                  },
+                  child: const SizedBox.expand(),
+                ),
               ),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }

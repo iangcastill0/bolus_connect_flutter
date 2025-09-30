@@ -19,13 +19,20 @@ platform :ios do
   desc "Push a new beta build to TestFlight"
   lane :beta do
     increment_build_number(xcodeproj: "Runner.xcodeproj")
+    
+    # Install the provisioning profile directly
+    install_provisioning_profile(path: "/Users/iangcastillo/Downloads/comcastillobolusConnectFlutter_AppStore.mobileprovision")
+    
     build_app(
       workspace: "Runner.xcworkspace",
       scheme: "Runner",
-      export_method: "app-store",
       export_options: {
-        signingStyle: "automatic",
-        teamID: "2946GBAHU9"
+        method: "app-store",
+        teamID: "2946GBAHU9",
+        signingStyle: "manual",
+        provisioningProfiles: {
+          "com.castillo.bolusConnectFlutter" => "com.castillo.bolusConnectFlutter AppStore"
+        }
       }
     )
     upload_to_testflight

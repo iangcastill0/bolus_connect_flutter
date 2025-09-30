@@ -15,6 +15,7 @@ class LogsPage extends StatefulWidget {
 class _LogsPageState extends State<LogsPage> {
   final List<BolusLogEntry> _entries = [];
   bool _loading = true;
+  final Set<DateTime> _expandedDates = <DateTime>{};
 
   @override
   void initState() {
@@ -50,6 +51,7 @@ class _LogsPageState extends State<LogsPage> {
         ..clear()
         ..addAll(logs);
       _loading = false;
+      _syncExpandedDates();
     });
   }
 
@@ -61,7 +63,7 @@ class _LogsPageState extends State<LogsPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Logs')),
+      appBar: AppBar(title: const Text('Insights')),
       body: RefreshIndicator(
         onRefresh: _onRefresh,
         child: _loading
@@ -86,28 +88,67 @@ class _LogsPageState extends State<LogsPage> {
   List<Widget> _buildDaySections(BuildContext context) {
     final theme = Theme.of(context);
     final groups = _groupEntriesByDay(_entries);
-    return groups
-        .map((group) => Card(
-              margin: const EdgeInsets.symmetric(vertical: 8),
+    return groups.map((group) {
+      final expanded = _expandedDates.contains(group.date);
+      final entryCount = group.entries.length;
+      final totalUnits =
+          group.entries.fold<double>(0, (sum, entry) => sum + entry.totalBolus);
+      final summary =
+          '${entryCount} log${entryCount == 1 ? '' : 's'} · ${totalUnits.toStringAsFixed(1)} U';
+
+      return Card(
+        margin: const EdgeInsets.symmetric(vertical: 8),
+        child: Column(
+          children: [
+            InkWell(
+              onTap: () => _toggleGroupExpansion(group.date),
               child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                child: Row(
                   children: [
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-                      child: Text(
-                        _LogEntryTile.formatDate(group.date),
-                        style: theme.textTheme.titleMedium,
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _LogEntryTile.formatDate(group.date),
+                            style: theme.textTheme.titleMedium,
+                          ),
+                          const SizedBox(height: 2),
+                          Text(summary, style: theme.textTheme.bodySmall),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    AnimatedRotation(
+                      turns: expanded ? 0.5 : 0.0,
+                      duration: const Duration(milliseconds: 200),
+                      curve: Curves.easeInOut,
+                      child: const Icon(Icons.keyboard_arrow_down_rounded),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            AnimatedCrossFade(
+              firstChild: const SizedBox.shrink(),
+              secondChild: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                child: Column(
+                  children: [
+                    const Divider(height: 24),
                     ..._buildEntriesForGroup(group),
                   ],
                 ),
               ),
-            ))
-        .toList();
+              crossFadeState:
+                  expanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+              duration: const Duration(milliseconds: 200),
+              sizeCurve: Curves.easeInOut,
+            ),
+          ],
+        ),
+      );
+    }).toList();
   }
 
   List<Widget> _buildEntriesForGroup(_DayGroup group) {
@@ -150,6 +191,7 @@ class _LogsPageState extends State<LogsPage> {
     if (!mounted) return;
     setState(() {
       _entries.removeWhere((e) => e.id == entry.id);
+      _syncExpandedDates();
     });
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -160,8 +202,7 @@ class _LogsPageState extends State<LogsPage> {
   List<_DayGroup> _groupEntriesByDay(List<BolusLogEntry> entries) {
     final map = <DateTime, List<BolusLogEntry>>{};
     for (final entry in entries) {
-      final ts = entry.timestamp.toLocal();
-      final dayKey = DateTime(ts.year, ts.month, ts.day);
+      final dayKey = _dayKey(entry.timestamp);
       map.putIfAbsent(dayKey, () => []).add(entry);
     }
     final groups = map.entries
@@ -172,6 +213,36 @@ class _LogsPageState extends State<LogsPage> {
       group.entries.sort((a, b) => b.timestamp.compareTo(a.timestamp));
     }
     return groups;
+  }
+
+  void _toggleGroupExpansion(DateTime date) {
+    setState(() {
+      if (_expandedDates.contains(date)) {
+        _expandedDates.remove(date);
+      } else {
+        _expandedDates.add(date);
+      }
+    });
+  }
+
+  void _syncExpandedDates() {
+    final currentDates =
+        _entries.map((entry) => _dayKey(entry.timestamp)).toSet();
+    _expandedDates.removeWhere((d) => !currentDates.contains(d));
+    if (_expandedDates.isEmpty && currentDates.isNotEmpty) {
+      DateTime latest = currentDates.first;
+      for (final date in currentDates) {
+        if (date.isAfter(latest)) {
+          latest = date;
+        }
+      }
+      _expandedDates.add(latest);
+    }
+  }
+
+  DateTime _dayKey(DateTime timestamp) {
+    final local = timestamp.toLocal();
+    return DateTime(local.year, local.month, local.day);
   }
 }
 

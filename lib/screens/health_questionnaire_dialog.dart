@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../widgets/keyboard_dismissible.dart';
+
 Future<HealthQuestionnaireResult?> showHealthQuestionnaireDialog(
   BuildContext context, {
   Map<String, dynamic>? initialAnswers,
@@ -119,52 +121,55 @@ class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
             onPressed: () => Navigator.of(context).maybePop(),
           ),
         ),
-        body: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                LinearProgressIndicator(value: (_step + 1) / _totalSteps),
-                const SizedBox(height: 24),
-                Text(
-                  _titles[_step],
-                  style: theme.textTheme.headlineSmall,
-                ),
-                const SizedBox(height: 12),
-                Expanded(
-                  child: PageView(
-                    controller: _pageController,
-                    physics: const NeverScrollableScrollPhysics(),
+        body: KeyboardDismissible(
+          child: SafeArea(
+            child: Padding(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  LinearProgressIndicator(value: (_step + 1) / _totalSteps),
+                  const SizedBox(height: 24),
+                  Text(
+                    _titles[_step],
+                    style: theme.textTheme.headlineSmall,
+                  ),
+                  const SizedBox(height: 12),
+                  Expanded(
+                    child: PageView(
+                      controller: _pageController,
+                      physics: const NeverScrollableScrollPhysics(),
+                      children: [
+                        _buildBasicInfoStep(),
+                        _buildMeasurementsStep(),
+                        _buildLifestyleStep(),
+                        _buildStressStep(),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
                     children: [
-                      _buildBasicInfoStep(),
-                      _buildMeasurementsStep(),
-                      _buildLifestyleStep(),
-                      _buildStressStep(),
+                      if (_step > 0)
+                        OutlinedButton(
+                          onPressed: () => _goToStep(_step - 1),
+                          child: const Text('Back'),
+                        )
+                      else
+                        const SizedBox(width: 0, height: 0),
+                      if (_step > 0) const SizedBox(width: 12),
+                      Expanded(
+                        child: FilledButton(
+                          onPressed: _handleNext,
+                          child: Text(
+                              _step == _totalSteps - 1 ? 'Finish' : 'Next'),
+                        ),
+                      ),
                     ],
                   ),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    if (_step > 0)
-                      OutlinedButton(
-                        onPressed: () => _goToStep(_step - 1),
-                        child: const Text('Back'),
-                      )
-                    else
-                      const SizedBox(width: 0, height: 0),
-                    if (_step > 0) const SizedBox(width: 12),
-                    Expanded(
-                      child: FilledButton(
-                        onPressed: _handleNext,
-                        child:
-                            Text(_step == _totalSteps - 1 ? 'Finish' : 'Next'),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
