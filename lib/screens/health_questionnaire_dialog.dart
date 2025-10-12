@@ -13,9 +13,7 @@ Future<HealthQuestionnaireResult?> showHealthQuestionnaireDialog(
 }) {
   return Navigator.of(context).push<HealthQuestionnaireResult>(
     MaterialPageRoute(
-      builder: (_) => _HealthQuestionnaireFlow(
-        initialAnswers: initialAnswers,
-      ),
+      builder: (_) => _HealthQuestionnaireFlow(initialAnswers: initialAnswers),
       fullscreenDialog: true,
     ),
   );
@@ -201,11 +199,7 @@ enum _FieldId {
   medications,
 }
 
-enum _Section {
-  basic,
-  measurements,
-  management,
-}
+enum _Section { basic, measurements, management }
 
 const Duration _kValidationFadeDuration = Duration(milliseconds: 180);
 
@@ -223,16 +217,8 @@ const Map<_FieldId, _Section> _fieldSection = {
 };
 
 const Map<_Section, Set<_FieldId>> _sectionFields = {
-  _Section.basic: {
-    _FieldId.fullName,
-    _FieldId.dob,
-    _FieldId.gender,
-  },
-  _Section.measurements: {
-    _FieldId.height,
-    _FieldId.weight,
-    _FieldId.country,
-  },
+  _Section.basic: {_FieldId.fullName, _FieldId.dob, _FieldId.gender},
+  _Section.measurements: {_FieldId.height, _FieldId.weight, _FieldId.country},
   _Section.management: {
     _FieldId.diabetesType,
     _FieldId.treatment,
@@ -302,21 +288,27 @@ class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
     super.initState();
     _heightController.addListener(_updateDerivedMetrics);
     _weightController.addListener(_updateDerivedMetrics);
-    _fullNameFocusNode.addListener(() => _handleFocusChange(
-          _fullNameFocusNode,
-          _FieldId.fullName,
-          _fullNameFieldKey,
-        ));
-    _heightFocusNode.addListener(() => _handleFocusChange(
-          _heightFocusNode,
-          _FieldId.height,
-          _heightFieldKey,
-        ));
-    _weightFocusNode.addListener(() => _handleFocusChange(
-          _weightFocusNode,
-          _FieldId.weight,
-          _weightFieldKey,
-        ));
+    _fullNameFocusNode.addListener(
+      () => _handleFocusChange(
+        _fullNameFocusNode,
+        _FieldId.fullName,
+        _fullNameFieldKey,
+      ),
+    );
+    _heightFocusNode.addListener(
+      () => _handleFocusChange(
+        _heightFocusNode,
+        _FieldId.height,
+        _heightFieldKey,
+      ),
+    );
+    _weightFocusNode.addListener(
+      () => _handleFocusChange(
+        _weightFocusNode,
+        _FieldId.weight,
+        _weightFieldKey,
+      ),
+    );
     _applyInitialAnswers();
   }
 
@@ -327,10 +319,7 @@ class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        child,
-        _validationIndicator(context, fieldId),
-      ],
+      children: [child, _validationIndicator(context, fieldId)],
     );
   }
 
@@ -348,8 +337,11 @@ class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.check_circle,
-                      size: 16, color: theme.colorScheme.primary),
+                  Icon(
+                    Icons.check_circle,
+                    size: 16,
+                    color: theme.colorScheme.primary,
+                  ),
                   const SizedBox(width: 4),
                   Text(
                     'Looks good',
@@ -471,7 +463,7 @@ class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
   }
 
   ({Map<String, dynamic> topLevel, Map<String, dynamic> profile})
-      _buildSectionPayload(_Section section) {
+  _buildSectionPayload(_Section section) {
     switch (section) {
       case _Section.basic:
         final topLevel = _withoutNulls(<String, dynamic>{
@@ -488,12 +480,19 @@ class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
       case _Section.measurements:
         final heightValue = _parsePositiveNumber(_heightController.text);
         final weightValue = _parsePositiveNumber(_weightController.text);
-        final heightCm =
-            heightValue == null ? null : _heightUnit == 'cm' ? heightValue : heightValue * 2.54;
-        final weightKg =
-            weightValue == null ? null : _weightUnit == 'kg' ? weightValue : weightValue * 0.45359237;
-        final bmi =
-            heightCm != null && weightKg != null ? _computeBmi(heightCm, weightKg) : null;
+        final heightCm = heightValue == null
+            ? null
+            : _heightUnit == 'cm'
+            ? heightValue
+            : heightValue * 2.54;
+        final weightKg = weightValue == null
+            ? null
+            : _weightUnit == 'kg'
+            ? weightValue
+            : weightValue * 0.45359237;
+        final bmi = heightCm != null && weightKg != null
+            ? _computeBmi(heightCm, weightKg)
+            : null;
         final topLevel = _withoutNulls(<String, dynamic>{
           'heightCm': heightCm,
           'weightKg': weightKg,
@@ -532,18 +531,16 @@ class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
   }
 
   void _refreshInitialValidity() {
-    _fieldValidity[_FieldId.fullName] =
-        _nameController.text.trim().length >= 2;
+    _fieldValidity[_FieldId.fullName] = _nameController.text.trim().length >= 2;
     _fieldValidity[_FieldId.dob] = _dob != null;
-    _fieldValidity[_FieldId.gender] =
-        _gender != null && _gender!.isNotEmpty;
+    _fieldValidity[_FieldId.gender] = _gender != null && _gender!.isNotEmpty;
 
     final heightValue = _parsePositiveNumber(_heightController.text);
     final heightCm = heightValue == null
         ? null
         : _heightUnit == 'cm'
-            ? heightValue
-            : heightValue * 2.54;
+        ? heightValue
+        : heightValue * 2.54;
     _fieldValidity[_FieldId.height] =
         heightCm != null && heightCm >= 50 && heightCm <= 250;
 
@@ -551,8 +548,8 @@ class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
     final weightKg = weightValue == null
         ? null
         : _weightUnit == 'kg'
-            ? weightValue
-            : weightValue * 0.45359237;
+        ? weightValue
+        : weightValue * 0.45359237;
     _fieldValidity[_FieldId.weight] =
         weightKg != null && weightKg >= 30 && weightKg <= 250;
 
@@ -602,8 +599,7 @@ class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
             child: Form(
               key: _formKey,
-              autovalidateMode:
-                  _submitted ? AutovalidateMode.always : AutovalidateMode.disabled,
+              autovalidateMode: AutovalidateMode.onUserInteraction,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -621,11 +617,12 @@ class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
                       controller: _nameController,
                       textCapitalization: TextCapitalization.words,
                       textInputAction: TextInputAction.next,
-                      decoration:
-                          const InputDecoration(labelText: 'Full name'),
+                      decoration: const InputDecoration(labelText: 'Full name'),
                       onChanged: (_) => _invalidateField(_FieldId.fullName),
-                      onEditingComplete: () =>
-                          _validateFormField(_FieldId.fullName, _fullNameFieldKey),
+                      onEditingComplete: () => _validateFormField(
+                        _FieldId.fullName,
+                        _fullNameFieldKey,
+                      ),
                       validator: (value) {
                         if (value == null || value.trim().isEmpty) {
                           return 'Please enter your name';
@@ -692,11 +689,14 @@ class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
                           _updateFieldValidity(_FieldId.gender, false);
                         } else {
                           _validateDropdownField(
-                              _FieldId.gender, _genderFieldKey);
+                            _FieldId.gender,
+                            _genderFieldKey,
+                          );
                         }
                       },
-                      validator: (value) =>
-                          value == null ? 'Select the option that fits best' : null,
+                      validator: (value) => value == null
+                          ? 'Select the option that fits best'
+                          : null,
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -711,8 +711,7 @@ class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
                             key: _heightFieldKey,
                             focusNode: _heightFocusNode,
                             controller: _heightController,
-                            keyboardType:
-                                const TextInputType.numberWithOptions(
+                            keyboardType: const TextInputType.numberWithOptions(
                               decimal: true,
                             ),
                             textInputAction: TextInputAction.next,
@@ -722,14 +721,17 @@ class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
                             ),
                             onChanged: (_) => _invalidateField(_FieldId.height),
                             onEditingComplete: () => _validateFormField(
-                                _FieldId.height, _heightFieldKey),
+                              _FieldId.height,
+                              _heightFieldKey,
+                            ),
                             validator: (value) {
                               final parsed = _parsePositiveNumber(value);
                               if (parsed == null) {
                                 return 'Enter your height';
                               }
-                              final heightCm =
-                                  _heightUnit == 'cm' ? parsed : parsed * 2.54;
+                              final heightCm = _heightUnit == 'cm'
+                                  ? parsed
+                                  : parsed * 2.54;
                               if (heightCm < 50 || heightCm > 250) {
                                 return 'Height should be between 50 and 250 cm';
                               }
@@ -747,7 +749,10 @@ class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
                           decoration: const InputDecoration(labelText: 'Unit'),
                           items: const [
                             DropdownMenuItem(value: 'cm', child: Text('cm')),
-                            DropdownMenuItem(value: 'in', child: Text('inches')),
+                            DropdownMenuItem(
+                              value: 'in',
+                              child: Text('inches'),
+                            ),
                           ],
                           onChanged: (value) {
                             if (value == null) return;
@@ -769,8 +774,7 @@ class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
                             key: _weightFieldKey,
                             focusNode: _weightFocusNode,
                             controller: _weightController,
-                            keyboardType:
-                                const TextInputType.numberWithOptions(
+                            keyboardType: const TextInputType.numberWithOptions(
                               decimal: true,
                             ),
                             textInputAction: TextInputAction.next,
@@ -780,7 +784,9 @@ class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
                             ),
                             onChanged: (_) => _invalidateField(_FieldId.weight),
                             onEditingComplete: () => _validateFormField(
-                                _FieldId.weight, _weightFieldKey),
+                              _FieldId.weight,
+                              _weightFieldKey,
+                            ),
                             validator: (value) {
                               final parsed = _parsePositiveNumber(value);
                               if (parsed == null) {
@@ -806,7 +812,10 @@ class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
                           decoration: const InputDecoration(labelText: 'Unit'),
                           items: const [
                             DropdownMenuItem(value: 'kg', child: Text('kg')),
-                            DropdownMenuItem(value: 'lb', child: Text('pounds')),
+                            DropdownMenuItem(
+                              value: 'lb',
+                              child: Text('pounds'),
+                            ),
                           ],
                           onChanged: (value) {
                             if (value == null) return;
@@ -869,7 +878,9 @@ class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
                           _updateFieldValidity(_FieldId.diabetesType, false);
                         } else {
                           _validateDropdownField(
-                              _FieldId.diabetesType, _diabetesTypeFieldKey);
+                            _FieldId.diabetesType,
+                            _diabetesTypeFieldKey,
+                          );
                         }
                       },
                       validator: (value) =>
@@ -901,7 +912,9 @@ class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
                           _updateFieldValidity(_FieldId.treatment, false);
                         } else {
                           _validateDropdownField(
-                              _FieldId.treatment, _treatmentFieldKey);
+                            _FieldId.treatment,
+                            _treatmentFieldKey,
+                          );
                         }
                       },
                       validator: (value) => value == null
@@ -910,21 +923,20 @@ class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
                     ),
                   ),
                   const SizedBox(height: 24),
-                  Text(
-                    'Known conditions',
-                    style: theme.textTheme.titleMedium,
-                  ),
+                  Text('Known conditions', style: theme.textTheme.titleMedium),
                   const SizedBox(height: 8),
                   Wrap(
                     spacing: 8,
                     runSpacing: 8,
                     children: _conditionOptions
-                        .map((option) => FilterChip(
-                              label: Text(option.label),
-                              selected: _conditions.contains(option.value),
-                              onSelected: (selected) =>
-                                  _toggleCondition(option.value, selected),
-                            ))
+                        .map(
+                          (option) => FilterChip(
+                            label: Text(option.label),
+                            selected: _conditions.contains(option.value),
+                            onSelected: (selected) =>
+                                _toggleCondition(option.value, selected),
+                          ),
+                        )
                         .toList(),
                   ),
                   if (_submitted && _conditions.isEmpty)
@@ -932,8 +944,9 @@ class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
                       padding: const EdgeInsets.only(top: 6),
                       child: Text(
                         'Select at least one known condition (or choose None).',
-                        style: theme.textTheme.bodySmall
-                            ?.copyWith(color: theme.colorScheme.error),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.error,
+                        ),
                       ),
                     ),
                   const SizedBox(height: 24),
@@ -946,12 +959,14 @@ class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
                     spacing: 8,
                     runSpacing: 8,
                     children: _medicationOptions
-                        .map((option) => FilterChip(
-                              label: Text(option.label),
-                              selected: _medications.contains(option.value),
-                              onSelected: (selected) =>
-                                  _toggleMedication(option.value, selected),
-                            ))
+                        .map(
+                          (option) => FilterChip(
+                            label: Text(option.label),
+                            selected: _medications.contains(option.value),
+                            onSelected: (selected) =>
+                                _toggleMedication(option.value, selected),
+                          ),
+                        )
                         .toList(),
                   ),
                   if (_submitted && _medications.isEmpty)
@@ -959,8 +974,9 @@ class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
                       padding: const EdgeInsets.only(top: 6),
                       child: Text(
                         'Select at least one medication (or choose None).',
-                        style: theme.textTheme.bodySmall
-                            ?.copyWith(color: theme.colorScheme.error),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.error,
+                        ),
                       ),
                     ),
                   const SizedBox(height: 32),
@@ -1032,8 +1048,7 @@ class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
       _glucoseUnit = storedUnit;
     }
 
-    final region =
-        _countryCode != null ? _findRegion(_countryCode!) : null;
+    final region = _countryCode != null ? _findRegion(_countryCode!) : null;
     if (region != null) {
       _glucoseUnit = region.glucoseUnit;
     }
@@ -1043,7 +1058,8 @@ class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
       _diabetesType = diabetesType;
     }
 
-    final treatment = data['treatment'] as String? ?? data['currentTreatment'] as String?;
+    final treatment =
+        data['treatment'] as String? ?? data['currentTreatment'] as String?;
     if (treatment != null && treatment.isNotEmpty) {
       _treatment = treatment;
     }
@@ -1052,14 +1068,18 @@ class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
     if (conditionsRaw is List) {
       _conditions
         ..clear()
-        ..addAll(conditionsRaw.map((e) => e.toString()).where((e) => e.isNotEmpty));
+        ..addAll(
+          conditionsRaw.map((e) => e.toString()).where((e) => e.isNotEmpty),
+        );
     }
 
     final medicationsRaw = data['medications'];
     if (medicationsRaw is List) {
       _medications
         ..clear()
-        ..addAll(medicationsRaw.map((e) => e.toString()).where((e) => e.isNotEmpty));
+        ..addAll(
+          medicationsRaw.map((e) => e.toString()).where((e) => e.isNotEmpty),
+        );
     }
 
     final bmi = _castToDouble(data['bmi']);
@@ -1071,15 +1091,17 @@ class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
     if (baseline is Map) {
       final lifestyle = baseline['lifestyle'];
       if (lifestyle is Map) {
-        _initialLifestyle =
-            lifestyle.map((key, value) => MapEntry(key.toString(), value));
+        _initialLifestyle = lifestyle.map(
+          (key, value) => MapEntry(key.toString(), value),
+        );
       }
       final activity = baseline['activity'];
       if (activity is Map) {
         final ipaq = activity['ipaq'];
         final mapSource = ipaq is Map ? ipaq : activity;
-        _initialActivity =
-            mapSource.map((key, value) => MapEntry(key.toString(), value));
+        _initialActivity = mapSource.map(
+          (key, value) => MapEntry(key.toString(), value),
+        );
       }
     }
 
@@ -1136,20 +1158,41 @@ class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
       return;
     }
 
-    final flowResult = await Navigator.of(context)
-        .push<_LifestyleFlowResult>(MaterialPageRoute(
-      builder: (_) => _LifestyleQuestionnairePage(
-        initialAnswers: _initialLifestyle,
-        initialActivityAnswers: _initialActivity,
+    final flowOutcome = await Navigator.of(context).push<Object?>(
+      MaterialPageRoute(
+        builder: (_) => _LifestyleQuestionnairePage(
+          initialAnswers: _initialLifestyle,
+          initialActivityAnswers: _initialActivity,
+        ),
+        fullscreenDialog: true,
       ),
-      fullscreenDialog: true,
-    ));
+    );
 
-    if (!mounted || flowResult == null) {
+    if (!mounted) {
       return;
     }
 
-    await _finalizeQuestionnaire(flowResult.lifestyle, flowResult.activity);
+    if (flowOutcome is Map) {
+      final lifestyleDraft = flowOutcome['lifestyleDraft'];
+      if (lifestyleDraft is Map) {
+        _initialLifestyle = lifestyleDraft.map(
+          (key, value) => MapEntry(key.toString(), value),
+        );
+      }
+      final activityDraft = flowOutcome['activityDraft'];
+      if (activityDraft is Map) {
+        _initialActivity = activityDraft.map(
+          (key, value) => MapEntry(key.toString(), value),
+        );
+      }
+      return;
+    }
+
+    if (flowOutcome is! _LifestyleFlowResult) {
+      return;
+    }
+
+    await _finalizeQuestionnaire(flowOutcome.lifestyle, flowOutcome.activity);
   }
 
   Future<void> _finalizeQuestionnaire(
@@ -1160,17 +1203,16 @@ class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
 
     final heightValue = _parsePositiveNumber(_heightController.text)!;
     final weightValue = _parsePositiveNumber(_weightController.text)!;
-    final heightCm =
-        _heightUnit == 'cm' ? heightValue : heightValue * 2.54;
-    final weightKg =
-        _weightUnit == 'kg' ? weightValue : weightValue * 0.45359237;
+    final heightCm = _heightUnit == 'cm' ? heightValue : heightValue * 2.54;
+    final weightKg = _weightUnit == 'kg'
+        ? weightValue
+        : weightValue * 0.45359237;
     final bmi = _computeBmi(heightCm, weightKg);
 
     final nowIso = DateTime.now().toIso8601String();
-    final existingCompletedAt =
-        widget.initialAnswers?['completedAt']?.toString();
-    final existingSyncedAt =
-        widget.initialAnswers?['lastSyncedAt']?.toString();
+    final existingCompletedAt = widget.initialAnswers?['completedAt']
+        ?.toString();
+    final existingSyncedAt = widget.initialAnswers?['lastSyncedAt']?.toString();
 
     final answers = <String, dynamic>{
       'fullName': _nameController.text.trim(),
@@ -1195,9 +1237,7 @@ class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
 
     final lifestyleMap = lifestyle.toMap();
     final activityMap = activity.toMap();
-    final activityContainer = {
-      'ipaq': activityMap,
-    };
+    final activityContainer = {'ipaq': activityMap};
     answers['baseline'] = {
       'lifestyle': lifestyleMap,
       'activity': activityContainer,
@@ -1222,10 +1262,7 @@ class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
         'conditions': answers['conditions'],
         'medications': answers['medications'],
       },
-      'baseline': {
-        'lifestyle': lifestyleMap,
-        'activity': activityContainer,
-      },
+      'baseline': {'lifestyle': lifestyleMap, 'activity': activityContainer},
     };
     answers['profile'] = profile;
 
@@ -1235,12 +1272,13 @@ class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
 
     final completedAt =
         DateTime.tryParse(answers['completedAt'] as String? ?? nowIso) ??
-            DateTime.now();
+        DateTime.now();
     final updatedAt =
         DateTime.tryParse(answers['updatedAt'] as String? ?? nowIso) ??
-            DateTime.now();
-    final lastSyncedAt =
-        existingSyncedAt != null ? DateTime.tryParse(existingSyncedAt) : null;
+        DateTime.now();
+    final lastSyncedAt = existingSyncedAt != null
+        ? DateTime.tryParse(existingSyncedAt)
+        : null;
 
     final result = HealthQuestionnaireResult(
       fullName: answers['fullName'] as String,
@@ -1381,15 +1419,14 @@ class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
       return;
     }
 
-    final heightCm =
-        _heightUnit == 'cm' ? heightValue : heightValue * 2.54;
-    final weightKg =
-        _weightUnit == 'kg' ? weightValue : weightValue * 0.45359237;
+    final heightCm = _heightUnit == 'cm' ? heightValue : heightValue * 2.54;
+    final weightKg = _weightUnit == 'kg'
+        ? weightValue
+        : weightValue * 0.45359237;
     final bmi = _computeBmi(heightCm, weightKg);
     if ((_bmi == null && bmi != null) ||
         (_bmi != null && bmi == null) ||
-        (_bmi != null && bmi != null &&
-            (bmi - _bmi!).abs() > 0.001)) {
+        (_bmi != null && bmi != null && (bmi - _bmi!).abs() > 0.001)) {
       setState(() => _bmi = bmi);
     }
   }
@@ -1424,7 +1461,7 @@ class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
     int age = now.year - dob.year;
     final hasHadBirthdayThisYear =
         (now.month > dob.month) ||
-            (now.month == dob.month && now.day >= dob.day);
+        (now.month == dob.month && now.day >= dob.day);
     if (!hasHadBirthdayThisYear) {
       age -= 1;
     }
@@ -1499,10 +1536,7 @@ class _LifestyleAnswers {
 }
 
 class _LifestyleFlowResult {
-  const _LifestyleFlowResult({
-    required this.lifestyle,
-    required this.activity,
-  });
+  const _LifestyleFlowResult({required this.lifestyle, required this.activity});
 
   final _LifestyleAnswers lifestyle;
   final _ActivityAnswers activity;
@@ -1541,6 +1575,7 @@ class _LifestyleQuestionnairePageState
   String? _energyLevel;
   bool _submitted = false;
   Map<String, dynamic>? _initialActivity;
+  Map<String, dynamic>? _lifestyleDraft;
 
   @override
   void initState() {
@@ -1557,9 +1592,11 @@ class _LifestyleQuestionnairePageState
   void _applyInitialAnswers() {
     final data = widget.initialAnswers;
     if (data == null) {
+      _lifestyleDraft = null;
       _initialActivity = widget.initialActivityAnswers;
       return;
     }
+    _lifestyleDraft = Map<String, dynamic>.from(data);
     _wakeUpTime = _parseTimeOfDay(data['wakeUpTime']?.toString());
     _bedtime = _parseTimeOfDay(data['bedtime']?.toString());
     _dinnerTime = _parseTimeOfDay(data['dinnerTime']?.toString());
@@ -1568,8 +1605,9 @@ class _LifestyleQuestionnairePageState
         ? sleepDuration.toDouble()
         : double.tryParse(sleepDuration?.toString() ?? '');
     if (duration != null) {
-      _sleepDurationController.text =
-          duration.toStringAsFixed(duration % 1 == 0 ? 0 : 1);
+      _sleepDurationController.text = duration.toStringAsFixed(
+        duration % 1 == 0 ? 0 : 1,
+      );
     }
     final sleepQuality = data['sleepQuality'];
     if (sleepQuality is num) {
@@ -1591,221 +1629,244 @@ class _LifestyleQuestionnairePageState
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Scaffold(
-      appBar: AppBar(
-        leading: BackButton(
-          onPressed: () {
-            final navigator = Navigator.of(context);
-            if (navigator.canPop()) {
-              navigator.pop();
-            }
-          },
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) {
+          return;
+        }
+        _returnDraftToParent();
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          leading: BackButton(onPressed: _returnDraftToParent),
+          title: const Text('Health Profile'),
         ),
-        title: const Text('Health Profile'),
-      ),
-      body: KeyboardDismissible(
-        child: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-            child: Form(
-              key: _formKey,
-              autovalidateMode: _submitted
-                  ? AutovalidateMode.always
-                  : AutovalidateMode.disabled,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text('Typical day',
-                      style: theme.textTheme.headlineSmall),
-                  const SizedBox(height: 4),
-                  Text(
-                    "Let's talk about your typical day.",
-                    style: theme.textTheme.bodyMedium,
-                  ),
-                  const SizedBox(height: 16),
-                  _buildTimeField(
-                    context: context,
-                    label: 'Wake-up time',
-                    value: _wakeUpTime,
-                    onPick: (picked) => setState(() => _wakeUpTime = picked),
-                  ),
-                  const SizedBox(height: 12),
-                  _buildTimeField(
-                    context: context,
-                    label: 'Bedtime',
-                    value: _bedtime,
-                    onPick: (picked) => setState(() => _bedtime = picked),
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: _sleepDurationController,
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
-                    decoration: const InputDecoration(
-                      labelText: 'Average sleep duration (hours)',
-                      hintText: 'e.g. 7.5',
+        body: KeyboardDismissible(
+          child: SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              child: Form(
+                key: _formKey,
+                autovalidateMode: AutovalidateMode.onUserInteraction,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text('Typical day', style: theme.textTheme.headlineSmall),
+                    const SizedBox(height: 4),
+                    Text(
+                      "Let's talk about your typical day.",
+                      style: theme.textTheme.bodyMedium,
                     ),
-                    validator: (value) {
-                      final parsed = double.tryParse(value?.replaceAll(',', '.') ?? '');
-                      if (parsed == null || parsed <= 0) {
-                        return 'Enter hours of sleep';
-                      }
-                      if (parsed > 24) {
-                        return 'Sleep duration must be less than 24 hours';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<int>(
-                    key: ValueKey('sleepQuality-$_sleepQuality'),
-                    initialValue: _sleepQuality,
-                    decoration: const InputDecoration(
-                      labelText: 'Sleep quality (1–5)',
+                    const SizedBox(height: 16),
+                    _buildTimeField(
+                      context: context,
+                      label: 'Wake-up time',
+                      value: _wakeUpTime,
+                      onPick: (picked) => setState(() => _wakeUpTime = picked),
                     ),
-                    items: List.generate(5, (index) {
-                      final value = index + 1;
-                      return DropdownMenuItem(
-                        value: value,
-                        child: Text(value.toString()),
-                      );
-                    }),
-                    onChanged: (value) => setState(() => _sleepQuality = value ?? 3),
-                  ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<String>(
-                    key: ValueKey('workPattern-${_workPattern ?? 'unset'}'),
-                    initialValue: _workPattern,
-                    decoration: const InputDecoration(labelText: 'Work pattern'),
-                    items: _workPatternOptions
-                        .map((option) => DropdownMenuItem(
-                              value: option.value,
-                              child: Text(option.label),
-                            ))
-                        .toList(),
-                    onChanged: (value) => setState(() => _workPattern = value),
-                    validator: (value) =>
-                        value == null ? 'Select your work pattern' : null,
-                  ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<String>(
-                    key:
-                        ValueKey('breakfast-${_breakfastHabit ?? 'unset'}'),
-                    initialValue: _breakfastHabit,
-                    decoration:
-                        const InputDecoration(labelText: 'Breakfast habit'),
-                    items: _breakfastHabitOptions
-                        .map((option) => DropdownMenuItem(
-                              value: option.value,
-                              child: Text(option.label),
-                            ))
-                        .toList(),
-                    onChanged: (value) => setState(() => _breakfastHabit = value),
-                    validator: (value) =>
-                        value == null ? 'Tell us about breakfast' : null,
-                  ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<int>(
-                    key: ValueKey('meals-${_mealsPerDay ?? 'unset'}'),
-                    initialValue: _mealsPerDay,
-                    decoration: const InputDecoration(
-                      labelText: 'Number of main meals per day',
+                    const SizedBox(height: 12),
+                    _buildTimeField(
+                      context: context,
+                      label: 'Bedtime',
+                      value: _bedtime,
+                      onPick: (picked) => setState(() => _bedtime = picked),
                     ),
-                    items: List.generate(6, (index) {
-                      final value = index + 1;
-                      return DropdownMenuItem(
-                        value: value,
-                        child: Text(value.toString()),
-                      );
-                    }),
-                    onChanged: (value) => setState(() => _mealsPerDay = value),
-                    validator: (value) =>
-                        value == null ? 'Select meals per day' : null,
-                  ),
-                  const SizedBox(height: 12),
-                  _buildTimeField(
-                    context: context,
-                    label: 'Typical dinner time',
-                    value: _dinnerTime,
-                    onPick: (picked) => setState(() => _dinnerTime = picked),
-                  ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<String>(
-                    key:
-                        ValueKey('caffeine-${_caffeineIntake ?? 'unset'}'),
-                    initialValue: _caffeineIntake,
-                    decoration:
-                        const InputDecoration(labelText: 'Caffeine intake per day'),
-                    items: _caffeineOptions
-                        .map((option) => DropdownMenuItem(
-                              value: option.value,
-                              child: Text(option.label),
-                            ))
-                        .toList(),
-                    onChanged: (value) => setState(() => _caffeineIntake = value),
-                    validator: (value) =>
-                        value == null ? 'Select caffeine intake' : null,
-                  ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<String>(
-                    key:
-                        ValueKey('alcohol-${_alcoholConsumption ?? 'unset'}'),
-                    initialValue: _alcoholConsumption,
-                    decoration: const InputDecoration(
-                      labelText: 'Alcohol consumption',
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: _sleepDurationController,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      decoration: const InputDecoration(
+                        labelText: 'Average sleep duration (hours)',
+                        hintText: 'e.g. 7.5',
+                      ),
+                      validator: (value) {
+                        final parsed = double.tryParse(
+                          value?.replaceAll(',', '.') ?? '',
+                        );
+                        if (parsed == null || parsed <= 0) {
+                          return 'Enter hours of sleep';
+                        }
+                        if (parsed > 24) {
+                          return 'Sleep duration must be less than 24 hours';
+                        }
+                        return null;
+                      },
                     ),
-                    items: _alcoholOptions
-                        .map((option) => DropdownMenuItem(
-                              value: option.value,
-                              child: Text(option.label),
-                            ))
-                        .toList(),
-                    onChanged: (value) =>
-                        setState(() => _alcoholConsumption = value),
-                    validator: (value) =>
-                        value == null ? 'Select alcohol consumption' : null,
-                  ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<String>(
-                    key:
-                        ValueKey('smoking-${_smokingStatus ?? 'unset'}'),
-                    initialValue: _smokingStatus,
-                    decoration:
-                        const InputDecoration(labelText: 'Smoking status'),
-                    items: _smokingOptions
-                        .map((option) => DropdownMenuItem(
-                              value: option.value,
-                              child: Text(option.label),
-                            ))
-                        .toList(),
-                    onChanged: (value) => setState(() => _smokingStatus = value),
-                    validator: (value) =>
-                        value == null ? 'Select smoking status' : null,
-                  ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<String>(
-                    key:
-                        ValueKey('energy-${_energyLevel ?? 'unset'}'),
-                    initialValue: _energyLevel,
-                    decoration: const InputDecoration(
-                      labelText: 'Perceived energy level throughout the day',
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<int>(
+                      key: ValueKey('sleepQuality-$_sleepQuality'),
+                      initialValue: _sleepQuality,
+                      decoration: const InputDecoration(
+                        labelText: 'Sleep quality (1–5)',
+                      ),
+                      items: List.generate(5, (index) {
+                        final value = index + 1;
+                        return DropdownMenuItem(
+                          value: value,
+                          child: Text(value.toString()),
+                        );
+                      }),
+                      onChanged: (value) =>
+                          setState(() => _sleepQuality = value ?? 3),
                     ),
-                    items: _energyLevelOptions
-                        .map((option) => DropdownMenuItem(
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      key: ValueKey('workPattern-${_workPattern ?? 'unset'}'),
+                      initialValue: _workPattern,
+                      decoration: const InputDecoration(
+                        labelText: 'Work pattern',
+                      ),
+                      items: _workPatternOptions
+                          .map(
+                            (option) => DropdownMenuItem(
                               value: option.value,
                               child: Text(option.label),
-                            ))
-                        .toList(),
-                    onChanged: (value) => setState(() => _energyLevel = value),
-                    validator: (value) =>
-                        value == null ? 'Select energy level' : null,
-                  ),
-                  const SizedBox(height: 24),
-                  FilledButton(
-                    onPressed: _handleSubmit,
-                    child: const Text('Continue'),
-                  ),
-                ],
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (value) =>
+                          setState(() => _workPattern = value),
+                      validator: (value) =>
+                          value == null ? 'Select your work pattern' : null,
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      key: ValueKey('breakfast-${_breakfastHabit ?? 'unset'}'),
+                      initialValue: _breakfastHabit,
+                      decoration: const InputDecoration(
+                        labelText: 'Breakfast habit',
+                      ),
+                      items: _breakfastHabitOptions
+                          .map(
+                            (option) => DropdownMenuItem(
+                              value: option.value,
+                              child: Text(option.label),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (value) =>
+                          setState(() => _breakfastHabit = value),
+                      validator: (value) =>
+                          value == null ? 'Tell us about breakfast' : null,
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<int>(
+                      key: ValueKey('meals-${_mealsPerDay ?? 'unset'}'),
+                      initialValue: _mealsPerDay,
+                      decoration: const InputDecoration(
+                        labelText: 'Number of main meals per day',
+                      ),
+                      items: List.generate(6, (index) {
+                        final value = index + 1;
+                        return DropdownMenuItem(
+                          value: value,
+                          child: Text(value.toString()),
+                        );
+                      }),
+                      onChanged: (value) =>
+                          setState(() => _mealsPerDay = value),
+                      validator: (value) =>
+                          value == null ? 'Select meals per day' : null,
+                    ),
+                    const SizedBox(height: 12),
+                    _buildTimeField(
+                      context: context,
+                      label: 'Typical dinner time',
+                      value: _dinnerTime,
+                      onPick: (picked) => setState(() => _dinnerTime = picked),
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      key: ValueKey('caffeine-${_caffeineIntake ?? 'unset'}'),
+                      initialValue: _caffeineIntake,
+                      decoration: const InputDecoration(
+                        labelText: 'Caffeine intake per day',
+                      ),
+                      items: _caffeineOptions
+                          .map(
+                            (option) => DropdownMenuItem(
+                              value: option.value,
+                              child: Text(option.label),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (value) =>
+                          setState(() => _caffeineIntake = value),
+                      validator: (value) =>
+                          value == null ? 'Select caffeine intake' : null,
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      key: ValueKey(
+                        'alcohol-${_alcoholConsumption ?? 'unset'}',
+                      ),
+                      initialValue: _alcoholConsumption,
+                      decoration: const InputDecoration(
+                        labelText: 'Alcohol consumption',
+                      ),
+                      items: _alcoholOptions
+                          .map(
+                            (option) => DropdownMenuItem(
+                              value: option.value,
+                              child: Text(option.label),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (value) =>
+                          setState(() => _alcoholConsumption = value),
+                      validator: (value) =>
+                          value == null ? 'Select alcohol consumption' : null,
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      key: ValueKey('smoking-${_smokingStatus ?? 'unset'}'),
+                      initialValue: _smokingStatus,
+                      decoration: const InputDecoration(
+                        labelText: 'Smoking status',
+                      ),
+                      items: _smokingOptions
+                          .map(
+                            (option) => DropdownMenuItem(
+                              value: option.value,
+                              child: Text(option.label),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (value) =>
+                          setState(() => _smokingStatus = value),
+                      validator: (value) =>
+                          value == null ? 'Select smoking status' : null,
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      key: ValueKey('energy-${_energyLevel ?? 'unset'}'),
+                      initialValue: _energyLevel,
+                      decoration: const InputDecoration(
+                        labelText: 'Perceived energy level throughout the day',
+                      ),
+                      items: _energyLevelOptions
+                          .map(
+                            (option) => DropdownMenuItem(
+                              value: option.value,
+                              child: Text(option.label),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (value) =>
+                          setState(() => _energyLevel = value),
+                      validator: (value) =>
+                          value == null ? 'Select energy level' : null,
+                    ),
+                    const SizedBox(height: 24),
+                    FilledButton(
+                      onPressed: _handleSubmit,
+                      child: const Text('Continue'),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -1821,13 +1882,16 @@ class _LifestyleQuestionnairePageState
     required ValueChanged<TimeOfDay> onPick,
   }) {
     return FormField<TimeOfDay>(
-      key: ValueKey('$label-${value != null ? _formatTimeOfDay(value) : 'unset'}'),
+      key: ValueKey(
+        '$label-${value != null ? _formatTimeOfDay(value) : 'unset'}',
+      ),
       initialValue: value,
       validator: (val) => val == null ? 'Select $label' : null,
       builder: (state) {
         final display = state.value != null
-            ? MaterialLocalizations.of(context)
-                .formatTimeOfDay(state.value!, alwaysUse24HourFormat: false)
+            ? MaterialLocalizations.of(
+                context,
+              ).formatTimeOfDay(state.value!, alwaysUse24HourFormat: false)
             : 'Select';
         final error = state.errorText;
         return Column(
@@ -1841,7 +1905,8 @@ class _LifestyleQuestionnairePageState
               onTap: () async {
                 final picked = await showTimePicker(
                   context: context,
-                  initialTime: state.value ?? const TimeOfDay(hour: 7, minute: 0),
+                  initialTime:
+                      state.value ?? const TimeOfDay(hour: 7, minute: 0),
                 );
                 if (picked != null) {
                   state.didChange(picked);
@@ -1854,10 +1919,9 @@ class _LifestyleQuestionnairePageState
                 padding: const EdgeInsets.only(left: 16, right: 16, bottom: 4),
                 child: Text(
                   error,
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodySmall
-                      ?.copyWith(color: Theme.of(context).colorScheme.error),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.error,
+                  ),
                 ),
               ),
           ],
@@ -1874,8 +1938,9 @@ class _LifestyleQuestionnairePageState
     if (!(_formKey.currentState?.validate() ?? false)) {
       return;
     }
-    final sleepDuration =
-        double.parse(_sleepDurationController.text.replaceAll(',', '.'));
+    final sleepDuration = double.parse(
+      _sleepDurationController.text.replaceAll(',', '.'),
+    );
     final answers = _LifestyleAnswers(
       wakeUpTime: _wakeUpTime!,
       bedtime: _bedtime!,
@@ -1890,20 +1955,95 @@ class _LifestyleQuestionnairePageState
       smokingStatus: _smokingStatus!,
       energyLevel: _energyLevel!,
     );
-    final activityAnswers = await Navigator.of(context)
-        .push<_ActivityAnswers>(MaterialPageRoute(
-      builder: (_) => _ActivityQuestionnairePage(
-        initialAnswers: _initialActivity,
+    final answersMap = answers.toMap();
+    _lifestyleDraft = answersMap;
+    final activityOutcome = await Navigator.of(context).push<Object?>(
+      MaterialPageRoute(
+        builder: (_) =>
+            _ActivityQuestionnairePage(initialAnswers: _initialActivity),
+        fullscreenDialog: true,
       ),
-      fullscreenDialog: true,
-    ));
+    );
 
-    if (!mounted || activityAnswers == null) {
+    if (!mounted) {
       return;
     }
 
-    Navigator.of(context)
-        .pop(_LifestyleFlowResult(lifestyle: answers, activity: activityAnswers));
+    if (activityOutcome is Map) {
+      final activityDraft = activityOutcome['activityDraft'];
+      if (activityDraft is Map) {
+        setState(() {
+          _initialActivity = activityDraft.map(
+            (key, value) => MapEntry(key.toString(), value),
+          );
+        });
+      }
+      return;
+    }
+
+    if (activityOutcome is! _ActivityAnswers) {
+      return;
+    }
+
+    _initialActivity = activityOutcome.toMap();
+    Navigator.of(
+      context,
+    ).pop(_LifestyleFlowResult(lifestyle: answers, activity: activityOutcome));
+  }
+
+  Map<String, dynamic> _collectLifestyleDraft() {
+    final map = <String, dynamic>{};
+    if (_wakeUpTime != null) {
+      map['wakeUpTime'] = _formatTimeOfDay(_wakeUpTime!);
+    }
+    if (_bedtime != null) {
+      map['bedtime'] = _formatTimeOfDay(_bedtime!);
+    }
+    final rawDuration = _sleepDurationController.text.trim();
+    final parsedDuration = double.tryParse(rawDuration.replaceAll(',', '.'));
+    if (parsedDuration != null && parsedDuration > 0) {
+      map['sleepDurationHours'] = parsedDuration;
+    }
+    map['sleepQuality'] = _sleepQuality;
+    if (_workPattern != null) {
+      map['workPattern'] = _workPattern;
+    }
+    if (_breakfastHabit != null) {
+      map['breakfastHabit'] = _breakfastHabit;
+    }
+    if (_mealsPerDay != null) {
+      map['mealsPerDay'] = _mealsPerDay;
+    }
+    if (_dinnerTime != null) {
+      map['dinnerTime'] = _formatTimeOfDay(_dinnerTime!);
+    }
+    if (_caffeineIntake != null) {
+      map['caffeineIntake'] = _caffeineIntake;
+    }
+    if (_alcoholConsumption != null) {
+      map['alcoholConsumption'] = _alcoholConsumption;
+    }
+    if (_smokingStatus != null) {
+      map['smokingStatus'] = _smokingStatus;
+    }
+    if (_energyLevel != null) {
+      map['energyLevel'] = _energyLevel;
+    }
+    return map;
+  }
+
+  void _returnDraftToParent() {
+    final currentDraft = _collectLifestyleDraft();
+    final mergedDraft = currentDraft.isNotEmpty
+        ? currentDraft
+        : (_lifestyleDraft != null
+              ? Map<String, dynamic>.from(_lifestyleDraft!)
+              : <String, dynamic>{});
+    final payload = <String, dynamic>{'lifestyleDraft': mergedDraft};
+    if (_initialActivity != null) {
+      payload['activityDraft'] = Map<String, dynamic>.from(_initialActivity!);
+    }
+    Navigator.of(context).pop(payload);
   }
 }
 
@@ -1980,8 +2120,7 @@ class _ActivityQuestionnairePageState
       TextEditingController();
   final TextEditingController _walkingMinutesController =
       TextEditingController();
-  final TextEditingController _sittingHoursController =
-      TextEditingController();
+  final TextEditingController _sittingHoursController = TextEditingController();
 
   int? _vigorousDays;
   int? _moderateDays;
@@ -2012,8 +2151,9 @@ class _ActivityQuestionnairePageState
     }
     final vigMinutes = data['vigorousMinutesPerDay'];
     if (vigMinutes is num) {
-      _vigorousMinutesController.text =
-          vigMinutes.toDouble().toStringAsFixed(vigMinutes % 1 == 0 ? 0 : 1);
+      _vigorousMinutesController.text = vigMinutes.toDouble().toStringAsFixed(
+        vigMinutes % 1 == 0 ? 0 : 1,
+      );
     }
     final modDays = data['moderateDaysPerWeek'];
     if (modDays is num) {
@@ -2021,8 +2161,9 @@ class _ActivityQuestionnairePageState
     }
     final modMinutes = data['moderateMinutesPerDay'];
     if (modMinutes is num) {
-      _moderateMinutesController.text =
-          modMinutes.toDouble().toStringAsFixed(modMinutes % 1 == 0 ? 0 : 1);
+      _moderateMinutesController.text = modMinutes.toDouble().toStringAsFixed(
+        modMinutes % 1 == 0 ? 0 : 1,
+      );
     }
     final walkDays = data['walkingDaysPerWeek'];
     if (walkDays is num) {
@@ -2030,118 +2171,120 @@ class _ActivityQuestionnairePageState
     }
     final walkMinutes = data['walkingMinutesPerDay'];
     if (walkMinutes is num) {
-      _walkingMinutesController.text =
-          walkMinutes.toDouble().toStringAsFixed(walkMinutes % 1 == 0 ? 0 : 1);
+      _walkingMinutesController.text = walkMinutes.toDouble().toStringAsFixed(
+        walkMinutes % 1 == 0 ? 0 : 1,
+      );
     }
     final sittingHours = data['sittingHoursPerDay'];
     if (sittingHours is num) {
-      _sittingHoursController.text =
-          sittingHours.toDouble().toStringAsFixed(sittingHours % 1 == 0 ? 0 : 1);
+      _sittingHoursController.text = sittingHours.toDouble().toStringAsFixed(
+        sittingHours % 1 == 0 ? 0 : 1,
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Scaffold(
-      appBar: AppBar(
-        leading: BackButton(
-          onPressed: () {
-            final navigator = Navigator.of(context);
-            if (navigator.canPop()) {
-              navigator.pop();
-            }
-          },
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) {
+          return;
+        }
+        _returnDraftToLifestyle();
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          leading: BackButton(onPressed: _returnDraftToLifestyle),
+          title: const Text('Health Profile'),
         ),
-        title: const Text('Health Profile'),
-      ),
-      body: KeyboardDismissible(
-        child: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-            child: Form(
-              key: _formKey,
-              autovalidateMode: _submitted
-                  ? AutovalidateMode.always
-                  : AutovalidateMode.disabled,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text('Activity & movement',
-                      style: theme.textTheme.headlineSmall),
-                  const SizedBox(height: 4),
-                  Text(
-                    "Let's capture your weekly activity.",
-                    style: theme.textTheme.bodyMedium,
-                  ),
-                  const SizedBox(height: 16),
-                  _buildDaysDropdown(
-                    label: 'Days per week with vigorous activity',
-                    value: _vigorousDays,
-                    onChanged: (value) {
-                      setState(() => _vigorousDays = value);
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  _buildMinutesField(
-                    controller: _vigorousMinutesController,
-                    label: 'Average minutes per day of vigorous activity',
-                    requirePositive: (_vigorousDays ?? 0) > 0,
-                  ),
-                  const SizedBox(height: 12),
-                  _buildDaysDropdown(
-                    label: 'Days per week with moderate activity',
-                    value: _moderateDays,
-                    onChanged: (value) {
-                      setState(() => _moderateDays = value);
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  _buildMinutesField(
-                    controller: _moderateMinutesController,
-                    label: 'Average minutes per day of moderate activity',
-                    requirePositive: (_moderateDays ?? 0) > 0,
-                  ),
-                  const SizedBox(height: 12),
-                  _buildDaysDropdown(
-                    label: 'Days per week walking ≥10 minutes continuously',
-                    value: _walkingDays,
-                    onChanged: (value) {
-                      setState(() => _walkingDays = value);
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  _buildMinutesField(
-                    controller: _walkingMinutesController,
-                    label: 'Average minutes per day walking',
-                    requirePositive: (_walkingDays ?? 0) > 0,
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: _sittingHoursController,
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
-                    decoration: const InputDecoration(
-                      labelText: 'Typical sitting time per day (hours)',
-                      hintText: 'e.g. 8',
+        body: KeyboardDismissible(
+          child: SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              child: Form(
+                key: _formKey,
+                autovalidateMode: AutovalidateMode.onUserInteraction,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      'Activity & movement',
+                      style: theme.textTheme.headlineSmall,
                     ),
-                    validator: (value) {
-                      final parsed = _parseNonNegative(value);
-                      if (parsed == null) {
-                        return 'Enter sitting hours per day';
-                      }
-                      if (parsed > 24) {
-                        return 'Must be 24 hours or less';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 24),
-                  FilledButton(
-                    onPressed: _handleSubmit,
-                    child: const Text('Finish'),
-                  ),
-                ],
+                    const SizedBox(height: 4),
+                    Text(
+                      "Let's capture your weekly activity.",
+                      style: theme.textTheme.bodyMedium,
+                    ),
+                    const SizedBox(height: 16),
+                    _buildDaysDropdown(
+                      label: 'Days per week with vigorous activity',
+                      value: _vigorousDays,
+                      onChanged: (value) =>
+                          setState(() => _vigorousDays = value),
+                    ),
+                    const SizedBox(height: 12),
+                    _buildMinutesField(
+                      controller: _vigorousMinutesController,
+                      label: 'Average minutes per day of vigorous activity',
+                      requirePositive: (_vigorousDays ?? 0) > 0,
+                    ),
+                    const SizedBox(height: 12),
+                    _buildDaysDropdown(
+                      label: 'Days per week with moderate activity',
+                      value: _moderateDays,
+                      onChanged: (value) =>
+                          setState(() => _moderateDays = value),
+                    ),
+                    const SizedBox(height: 12),
+                    _buildMinutesField(
+                      controller: _moderateMinutesController,
+                      label: 'Average minutes per day of moderate activity',
+                      requirePositive: (_moderateDays ?? 0) > 0,
+                    ),
+                    const SizedBox(height: 12),
+                    _buildDaysDropdown(
+                      label: 'Days per week walking ≥10 minutes continuously',
+                      value: _walkingDays,
+                      onChanged: (value) =>
+                          setState(() => _walkingDays = value),
+                    ),
+                    const SizedBox(height: 12),
+                    _buildMinutesField(
+                      controller: _walkingMinutesController,
+                      label: 'Average minutes per day walking',
+                      requirePositive: (_walkingDays ?? 0) > 0,
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: _sittingHoursController,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      decoration: const InputDecoration(
+                        labelText: 'Typical sitting time per day (hours)',
+                        hintText: 'e.g. 8',
+                      ),
+                      validator: (value) {
+                        final parsed = _parseNonNegative(value);
+                        if (parsed == null) {
+                          return 'Enter sitting hours per day';
+                        }
+                        if (parsed > 24) {
+                          return 'Must be 24 hours or less';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 24),
+                    FilledButton(
+                      onPressed: _handleSubmit,
+                      child: const Text('Finish'),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -2160,10 +2303,7 @@ class _ActivityQuestionnairePageState
       initialValue: value,
       decoration: InputDecoration(labelText: label),
       items: List.generate(8, (index) {
-        return DropdownMenuItem(
-          value: index,
-          child: Text(index.toString()),
-        );
+        return DropdownMenuItem(value: index, child: Text(index.toString()));
       }),
       onChanged: onChanged,
       validator: (val) => val == null ? 'Select $label' : null,
@@ -2178,10 +2318,7 @@ class _ActivityQuestionnairePageState
     return TextFormField(
       controller: controller,
       keyboardType: const TextInputType.numberWithOptions(decimal: true),
-      decoration: InputDecoration(
-        labelText: label,
-        hintText: 'e.g. 30',
-      ),
+      decoration: InputDecoration(labelText: label, hintText: 'e.g. 30'),
       validator: (value) {
         final parsed = _parseNonNegative(value);
         if (requirePositive) {
@@ -2218,8 +2355,7 @@ class _ActivityQuestionnairePageState
         _parseNonNegative(_moderateMinutesController.text) ?? 0;
     final walkingMinutes =
         _parseNonNegative(_walkingMinutesController.text) ?? 0;
-    final sittingHours =
-        _parseNonNegative(_sittingHoursController.text) ?? 0;
+    final sittingHours = _parseNonNegative(_sittingHoursController.text) ?? 0;
 
     final answers = _ActivityAnswers(
       vigorousDays: _vigorousDays ?? 0,
@@ -2232,5 +2368,22 @@ class _ActivityQuestionnairePageState
     );
 
     Navigator.of(context).pop(answers);
+  }
+
+  Map<String, dynamic> _collectActivityDraft() {
+    final draft = _ActivityAnswers(
+      vigorousDays: _vigorousDays ?? 0,
+      vigorousMinutes: _parseNonNegative(_vigorousMinutesController.text) ?? 0,
+      moderateDays: _moderateDays ?? 0,
+      moderateMinutes: _parseNonNegative(_moderateMinutesController.text) ?? 0,
+      walkingDays: _walkingDays ?? 0,
+      walkingMinutes: _parseNonNegative(_walkingMinutesController.text) ?? 0,
+      sittingHours: _parseNonNegative(_sittingHoursController.text) ?? 0,
+    );
+    return draft.toMap();
+  }
+
+  void _returnDraftToLifestyle() {
+    Navigator.of(context).pop({'activityDraft': _collectActivityDraft()});
   }
 }
