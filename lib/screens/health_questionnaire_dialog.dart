@@ -10,10 +10,14 @@ import '../services/health_questionnaire_service.dart';
 Future<HealthQuestionnaireResult?> showHealthQuestionnaireDialog(
   BuildContext context, {
   Map<String, dynamic>? initialAnswers,
+  bool allowCancel = true,
 }) {
   return Navigator.of(context).push<HealthQuestionnaireResult>(
     MaterialPageRoute(
-      builder: (_) => _HealthQuestionnaireFlow(initialAnswers: initialAnswers),
+      builder: (_) => _HealthQuestionnaireFlow(
+        initialAnswers: initialAnswers,
+        allowCancel: allowCancel,
+      ),
       fullscreenDialog: true,
     ),
   );
@@ -35,6 +39,10 @@ class HealthQuestionnaireResult {
     this.bmi,
     required this.baselineLifestyle,
     required this.baselineActivity,
+    required this.baselineStress,
+    required this.baselineSleep,
+    required this.baselineNutrition,
+    required this.baselinePsych,
     required this.completedAt,
     required this.updatedAt,
     this.lastSyncedAt,
@@ -55,6 +63,10 @@ class HealthQuestionnaireResult {
   final double? bmi;
   final Map<String, dynamic> baselineLifestyle;
   final Map<String, dynamic> baselineActivity;
+  final Map<String, dynamic> baselineStress;
+  final Map<String, dynamic> baselineSleep;
+  final Map<String, dynamic> baselineNutrition;
+  final Map<String, dynamic> baselinePsych;
   final DateTime completedAt;
   final DateTime updatedAt;
   final DateTime? lastSyncedAt;
@@ -228,9 +240,13 @@ const Map<_Section, Set<_FieldId>> _sectionFields = {
 };
 
 class _HealthQuestionnaireFlow extends StatefulWidget {
-  const _HealthQuestionnaireFlow({this.initialAnswers});
+  const _HealthQuestionnaireFlow({
+    this.initialAnswers,
+    this.allowCancel = true,
+  });
 
   final Map<String, dynamic>? initialAnswers;
+  final bool allowCancel;
 
   @override
   State<_HealthQuestionnaireFlow> createState() =>
@@ -269,10 +285,14 @@ class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
   final Set<String> _conditions = <String>{};
   final Set<String> _medications = <String>{};
   double? _bmi;
-  bool _submitted = false;
+  bool _showSelectionErrors = false;
   Map<String, dynamic> _draftAnswers = <String, dynamic>{};
   Map<String, dynamic>? _initialLifestyle;
   Map<String, dynamic>? _initialActivity;
+  Map<String, dynamic>? _initialStress;
+  Map<String, dynamic>? _initialSleep;
+  Map<String, dynamic>? _initialNutrition;
+  Map<String, dynamic>? _initialPsych;
   final Map<_FieldId, bool> _fieldValidity = {
     for (final id in _FieldId.values) id: false,
   };
@@ -581,18 +601,19 @@ class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isSaving = _sectionSaving.values.any((saving) => saving);
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Health Profile'),
-        leading: BackButton(
-          onPressed: () {
-            final navigator = Navigator.of(context);
-            if (navigator.canPop()) {
-              navigator.pop();
-            }
-          },
-        ),
-      ),
+    final leading = widget.allowCancel
+        ? BackButton(
+            onPressed: () {
+              final navigator = Navigator.of(context);
+              if (navigator.canPop()) {
+                navigator.pop();
+              }
+            },
+          )
+        : null;
+
+    final scaffold = Scaffold(
+      appBar: AppBar(title: const Text('Health Profile'), leading: leading),
       body: KeyboardDismissible(
         child: SafeArea(
           child: SingleChildScrollView(
@@ -939,7 +960,7 @@ class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
                         )
                         .toList(),
                   ),
-                  if (_submitted && _conditions.isEmpty)
+                  if (_showSelectionErrors && _conditions.isEmpty)
                     Padding(
                       padding: const EdgeInsets.only(top: 6),
                       child: Text(
@@ -969,7 +990,7 @@ class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
                         )
                         .toList(),
                   ),
-                  if (_submitted && _medications.isEmpty)
+                  if (_showSelectionErrors && _medications.isEmpty)
                     Padding(
                       padding: const EdgeInsets.only(top: 6),
                       child: Text(
@@ -996,6 +1017,15 @@ class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
           ),
         ),
       ),
+    );
+    if (widget.allowCancel) {
+      return scaffold;
+    }
+
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (_, __) {},
+      child: scaffold,
     );
   }
 
@@ -1103,6 +1133,30 @@ class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
           (key, value) => MapEntry(key.toString(), value),
         );
       }
+      final stress = baseline['stress'];
+      if (stress is Map) {
+        _initialStress = stress.map(
+          (key, value) => MapEntry(key.toString(), value),
+        );
+      }
+      final sleep = baseline['sleep'];
+      if (sleep is Map) {
+        _initialSleep = sleep.map(
+          (key, value) => MapEntry(key.toString(), value),
+        );
+      }
+      final nutrition = baseline['nutrition'];
+      if (nutrition is Map) {
+        _initialNutrition = nutrition.map(
+          (key, value) => MapEntry(key.toString(), value),
+        );
+      }
+      final psych = baseline['psych'];
+      if (psych is Map) {
+        _initialPsych = psych.map(
+          (key, value) => MapEntry(key.toString(), value),
+        );
+      }
     }
 
     // Refresh derived metrics to ensure BMI reflects current inputs.
@@ -1130,13 +1184,14 @@ class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
 
   Future<void> _handleContinue() async {
     FocusScope.of(context).unfocus();
-    if (!_submitted) {
-      setState(() {
-        _submitted = true;
-      });
+    final formValid = _formKey.currentState?.validate() ?? false;
+    final selectionsValid = _conditions.isNotEmpty && _medications.isNotEmpty;
+
+    if (!selectionsValid) {
+      setState(() => _showSelectionErrors = true);
     }
 
-    if (!(_formKey.currentState?.validate() ?? false)) {
+    if (!formValid || !selectionsValid) {
       return;
     }
     if (_dob == null) {
@@ -1148,58 +1203,35 @@ class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
     if (_countryCode == null) {
       return;
     }
-    if (_conditions.isEmpty || _medications.isEmpty) {
-      setState(() {});
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please select at least one condition and medication.'),
-        ),
-      );
-      return;
-    }
+    setState(() => _showSelectionErrors = false);
 
-    final flowOutcome = await Navigator.of(context).push<Object?>(
+    final flowResult = await Navigator.of(context).push<_LifestyleFlowResult>(
       MaterialPageRoute(
         builder: (_) => _LifestyleQuestionnairePage(
           initialAnswers: _initialLifestyle,
           initialActivityAnswers: _initialActivity,
+          initialStressAnswers: _initialStress,
+          initialSleepAnswers: _initialSleep,
+          initialNutritionAnswers: _initialNutrition,
+          initialPsychAnswers: _initialPsych,
         ),
         fullscreenDialog: true,
       ),
     );
 
-    if (!mounted) {
+    if (!mounted || flowResult == null) {
       return;
     }
 
-    if (flowOutcome is Map) {
-      final lifestyleDraft = flowOutcome['lifestyleDraft'];
-      if (lifestyleDraft is Map) {
-        _initialLifestyle = lifestyleDraft.map(
-          (key, value) => MapEntry(key.toString(), value),
-        );
-      }
-      final activityDraft = flowOutcome['activityDraft'];
-      if (activityDraft is Map) {
-        _initialActivity = activityDraft.map(
-          (key, value) => MapEntry(key.toString(), value),
-        );
-      }
-      return;
-    }
-
-    if (flowOutcome is! _LifestyleFlowResult) {
-      return;
-    }
-
-    await _finalizeQuestionnaire(flowOutcome.lifestyle, flowOutcome.activity);
+    await _finalizeQuestionnaire(flowResult);
   }
 
-  Future<void> _finalizeQuestionnaire(
-    _LifestyleAnswers lifestyle,
-    _ActivityAnswers activity,
-  ) async {
+  Future<void> _finalizeQuestionnaire(_LifestyleFlowResult flow) async {
     FocusScope.of(context).unfocus();
+
+    final lifestyle = flow.lifestyle;
+    final activity = flow.activity;
+    final stressSleep = flow.stressSleep;
 
     final heightValue = _parsePositiveNumber(_heightController.text)!;
     final weightValue = _parsePositiveNumber(_weightController.text)!;
@@ -1238,10 +1270,45 @@ class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
     final lifestyleMap = lifestyle.toMap();
     final activityMap = activity.toMap();
     final activityContainer = {'ipaq': activityMap};
+    final stressMap = stressSleep.toStressMap();
+    final sleepMap = stressSleep.toSleepMap();
+    stressMap['loadIndex'] = stressSleep.stressLoad;
+    final nutritionMap = stressSleep.toNutritionMap();
+    final psychMap = stressSleep.toPsychMap();
     answers['baseline'] = {
       'lifestyle': lifestyleMap,
       'activity': activityContainer,
+      'stress': stressMap,
+      'sleep': sleepMap,
+      'nutrition': nutritionMap,
+      'psych': psychMap,
     };
+
+    final metrics = <String, dynamic>{};
+    final existingMetrics = widget.initialAnswers?['metrics'];
+    if (existingMetrics is Map) {
+      existingMetrics.forEach((key, value) {
+        metrics[key.toString()] = value;
+      });
+    }
+    metrics['nutrition'] = {'index': nutritionMap['index']};
+    metrics['psych'] = {'index': psychMap['index']};
+    answers['metrics'] = metrics;
+
+    final flags = <String, dynamic>{};
+    final existingFlags = widget.initialAnswers?['flags'];
+    if (existingFlags is Map) {
+      existingFlags.forEach((key, value) {
+        flags[key.toString()] = value;
+      });
+    }
+    final supportNeeded = psychMap['supportNeeded'] == true;
+    if (supportNeeded) {
+      flags['support_needed'] = true;
+    }
+    if (flags.isNotEmpty) {
+      answers['flags'] = flags;
+    }
 
     final profile = <String, dynamic>{
       'basic': {
@@ -1262,13 +1329,24 @@ class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
         'conditions': answers['conditions'],
         'medications': answers['medications'],
       },
-      'baseline': {'lifestyle': lifestyleMap, 'activity': activityContainer},
+      'baseline': {
+        'lifestyle': lifestyleMap,
+        'activity': activityContainer,
+        'stress': stressMap,
+        'sleep': sleepMap,
+        'nutrition': nutritionMap,
+        'psych': psychMap,
+      },
     };
     answers['profile'] = profile;
 
     _draftAnswers = Map<String, dynamic>.from(answers);
     _initialLifestyle = lifestyleMap;
     _initialActivity = activityMap;
+    _initialStress = stressMap;
+    _initialSleep = sleepMap;
+    _initialNutrition = nutritionMap;
+    _initialPsych = psychMap;
 
     final completedAt =
         DateTime.tryParse(answers['completedAt'] as String? ?? nowIso) ??
@@ -1295,6 +1373,10 @@ class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
       bmi: bmi,
       baselineLifestyle: lifestyleMap,
       baselineActivity: activityMap,
+      baselineStress: stressMap,
+      baselineSleep: sleepMap,
+      baselineNutrition: nutritionMap,
+      baselinePsych: psychMap,
       completedAt: completedAt,
       updatedAt: updatedAt,
       lastSyncedAt: lastSyncedAt,
@@ -1536,20 +1618,59 @@ class _LifestyleAnswers {
 }
 
 class _LifestyleFlowResult {
-  const _LifestyleFlowResult({required this.lifestyle, required this.activity});
+  const _LifestyleFlowResult({
+    required this.lifestyle,
+    required this.activity,
+    required this.stressSleep,
+  });
 
   final _LifestyleAnswers lifestyle;
   final _ActivityAnswers activity;
+  final _StressSleepResult stressSleep;
+}
+
+class _ActivityNavigationResult {
+  const _ActivityNavigationResult.back({
+    required this.activity,
+    this.stress,
+    this.sleep,
+    this.nutrition,
+    this.psych,
+  });
+
+  final Map<String, dynamic> activity;
+  final Map<String, dynamic>? stress;
+  final Map<String, dynamic>? sleep;
+  final Map<String, dynamic>? nutrition;
+  final Map<String, dynamic>? psych;
+}
+
+class _ActivityFlowResult {
+  const _ActivityFlowResult({
+    required this.activity,
+    required this.stressSleep,
+  });
+
+  final _ActivityAnswers activity;
+  final _StressSleepResult stressSleep;
 }
 
 class _LifestyleQuestionnairePage extends StatefulWidget {
   const _LifestyleQuestionnairePage({
     this.initialAnswers,
     this.initialActivityAnswers,
+    this.initialStressAnswers,
+    this.initialSleepAnswers,
+    this.initialNutritionAnswers,
+    this.initialPsychAnswers,
   });
 
   final Map<String, dynamic>? initialAnswers;
   final Map<String, dynamic>? initialActivityAnswers;
+  final Map<String, dynamic>? initialStressAnswers;
+  final Map<String, dynamic>? initialSleepAnswers;
+  final Map<String, dynamic>? initialNutritionAnswers;
+  final Map<String, dynamic>? initialPsychAnswers;
 
   @override
   State<_LifestyleQuestionnairePage> createState() =>
@@ -1573,9 +1694,12 @@ class _LifestyleQuestionnairePageState
   String? _alcoholConsumption;
   String? _smokingStatus;
   String? _energyLevel;
-  bool _submitted = false;
+  Map<String, dynamic>? _initialLifestyle;
   Map<String, dynamic>? _initialActivity;
-  Map<String, dynamic>? _lifestyleDraft;
+  Map<String, dynamic>? _initialStress;
+  Map<String, dynamic>? _initialSleep;
+  Map<String, dynamic>? _initialNutrition;
+  Map<String, dynamic>? _initialPsych;
 
   @override
   void initState() {
@@ -1592,11 +1716,15 @@ class _LifestyleQuestionnairePageState
   void _applyInitialAnswers() {
     final data = widget.initialAnswers;
     if (data == null) {
-      _lifestyleDraft = null;
+      _initialLifestyle = null;
       _initialActivity = widget.initialActivityAnswers;
+      _initialStress = widget.initialStressAnswers;
+      _initialSleep = widget.initialSleepAnswers;
+      _initialNutrition = widget.initialNutritionAnswers;
+      _initialPsych = widget.initialPsychAnswers;
       return;
     }
-    _lifestyleDraft = Map<String, dynamic>.from(data);
+    _initialLifestyle = Map<String, dynamic>.from(data);
     _wakeUpTime = _parseTimeOfDay(data['wakeUpTime']?.toString());
     _bedtime = _parseTimeOfDay(data['bedtime']?.toString());
     _dinnerTime = _parseTimeOfDay(data['dinnerTime']?.toString());
@@ -1624,249 +1752,246 @@ class _LifestyleQuestionnairePageState
     _smokingStatus = data['smokingStatus']?.toString();
     _energyLevel = data['energyLevel']?.toString();
     _initialActivity = widget.initialActivityAnswers;
+    _initialStress = widget.initialStressAnswers;
+    _initialSleep = widget.initialSleepAnswers;
+    _initialNutrition = widget.initialNutritionAnswers;
+    _initialPsych = widget.initialPsychAnswers;
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, _) {
-        if (didPop) {
-          return;
-        }
-        _returnDraftToParent();
-      },
-      child: Scaffold(
-        appBar: AppBar(
-          leading: BackButton(onPressed: _returnDraftToParent),
-          title: const Text('Health Profile'),
+    return Scaffold(
+      appBar: AppBar(
+        leading: BackButton(
+          onPressed: () {
+            final navigator = Navigator.of(context);
+            if (navigator.canPop()) {
+              navigator.pop();
+            }
+          },
         ),
-        body: KeyboardDismissible(
-          child: SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-              child: Form(
-                key: _formKey,
-                autovalidateMode: AutovalidateMode.onUserInteraction,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text('Typical day', style: theme.textTheme.headlineSmall),
-                    const SizedBox(height: 4),
-                    Text(
-                      "Let's talk about your typical day.",
-                      style: theme.textTheme.bodyMedium,
+        title: const Text('Health Profile'),
+      ),
+      body: KeyboardDismissible(
+        child: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            child: Form(
+              key: _formKey,
+              autovalidateMode: AutovalidateMode.onUserInteraction,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text('Typical Day', style: theme.textTheme.headlineSmall),
+                  const SizedBox(height: 4),
+                  Text(
+                    "Let's talk about your typical day.",
+                    style: theme.textTheme.bodyMedium,
+                  ),
+                  const SizedBox(height: 16),
+                  _buildTimeField(
+                    context: context,
+                    label: 'Wake-up time',
+                    value: _wakeUpTime,
+                    onPick: (picked) => setState(() => _wakeUpTime = picked),
+                  ),
+                  const SizedBox(height: 12),
+                  _buildTimeField(
+                    context: context,
+                    label: 'Bedtime',
+                    value: _bedtime,
+                    onPick: (picked) => setState(() => _bedtime = picked),
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _sleepDurationController,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
                     ),
-                    const SizedBox(height: 16),
-                    _buildTimeField(
-                      context: context,
-                      label: 'Wake-up time',
-                      value: _wakeUpTime,
-                      onPick: (picked) => setState(() => _wakeUpTime = picked),
+                    decoration: const InputDecoration(
+                      labelText: 'Average sleep duration (hours)',
+                      hintText: 'e.g. 7.5',
                     ),
-                    const SizedBox(height: 12),
-                    _buildTimeField(
-                      context: context,
-                      label: 'Bedtime',
-                      value: _bedtime,
-                      onPick: (picked) => setState(() => _bedtime = picked),
+                    validator: (value) {
+                      final parsed = double.tryParse(
+                        value?.replaceAll(',', '.') ?? '',
+                      );
+                      if (parsed == null || parsed <= 0) {
+                        return 'Enter hours of sleep';
+                      }
+                      if (parsed > 24) {
+                        return 'Sleep duration must be less than 24 hours';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<int>(
+                    key: ValueKey('sleepQuality-$_sleepQuality'),
+                    initialValue: _sleepQuality,
+                    decoration: const InputDecoration(
+                      labelText: 'Sleep quality (1–5)',
                     ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _sleepDurationController,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      decoration: const InputDecoration(
-                        labelText: 'Average sleep duration (hours)',
-                        hintText: 'e.g. 7.5',
-                      ),
-                      validator: (value) {
-                        final parsed = double.tryParse(
-                          value?.replaceAll(',', '.') ?? '',
-                        );
-                        if (parsed == null || parsed <= 0) {
-                          return 'Enter hours of sleep';
-                        }
-                        if (parsed > 24) {
-                          return 'Sleep duration must be less than 24 hours';
-                        }
-                        return null;
-                      },
+                    items: List.generate(5, (index) {
+                      final value = index + 1;
+                      return DropdownMenuItem(
+                        value: value,
+                        child: Text(value.toString()),
+                      );
+                    }),
+                    onChanged: (value) =>
+                        setState(() => _sleepQuality = value ?? 3),
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    key: ValueKey('workPattern-${_workPattern ?? 'unset'}'),
+                    initialValue: _workPattern,
+                    decoration: const InputDecoration(
+                      labelText: 'Work pattern',
                     ),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<int>(
-                      key: ValueKey('sleepQuality-$_sleepQuality'),
-                      initialValue: _sleepQuality,
-                      decoration: const InputDecoration(
-                        labelText: 'Sleep quality (1–5)',
-                      ),
-                      items: List.generate(5, (index) {
-                        final value = index + 1;
-                        return DropdownMenuItem(
-                          value: value,
-                          child: Text(value.toString()),
-                        );
-                      }),
-                      onChanged: (value) =>
-                          setState(() => _sleepQuality = value ?? 3),
+                    items: _workPatternOptions
+                        .map(
+                          (option) => DropdownMenuItem(
+                            value: option.value,
+                            child: Text(option.label),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (value) => setState(() => _workPattern = value),
+                    validator: (value) =>
+                        value == null ? 'Select your work pattern' : null,
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    key: ValueKey('breakfast-${_breakfastHabit ?? 'unset'}'),
+                    initialValue: _breakfastHabit,
+                    decoration: const InputDecoration(
+                      labelText: 'Breakfast habit',
                     ),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<String>(
-                      key: ValueKey('workPattern-${_workPattern ?? 'unset'}'),
-                      initialValue: _workPattern,
-                      decoration: const InputDecoration(
-                        labelText: 'Work pattern',
-                      ),
-                      items: _workPatternOptions
-                          .map(
-                            (option) => DropdownMenuItem(
-                              value: option.value,
-                              child: Text(option.label),
-                            ),
-                          )
-                          .toList(),
-                      onChanged: (value) =>
-                          setState(() => _workPattern = value),
-                      validator: (value) =>
-                          value == null ? 'Select your work pattern' : null,
+                    items: _breakfastHabitOptions
+                        .map(
+                          (option) => DropdownMenuItem(
+                            value: option.value,
+                            child: Text(option.label),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (value) =>
+                        setState(() => _breakfastHabit = value),
+                    validator: (value) =>
+                        value == null ? 'Tell us about breakfast' : null,
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<int>(
+                    key: ValueKey('meals-${_mealsPerDay ?? 'unset'}'),
+                    initialValue: _mealsPerDay,
+                    decoration: const InputDecoration(
+                      labelText: 'Number of main meals per day',
                     ),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<String>(
-                      key: ValueKey('breakfast-${_breakfastHabit ?? 'unset'}'),
-                      initialValue: _breakfastHabit,
-                      decoration: const InputDecoration(
-                        labelText: 'Breakfast habit',
-                      ),
-                      items: _breakfastHabitOptions
-                          .map(
-                            (option) => DropdownMenuItem(
-                              value: option.value,
-                              child: Text(option.label),
-                            ),
-                          )
-                          .toList(),
-                      onChanged: (value) =>
-                          setState(() => _breakfastHabit = value),
-                      validator: (value) =>
-                          value == null ? 'Tell us about breakfast' : null,
+                    items: List.generate(6, (index) {
+                      final value = index + 1;
+                      return DropdownMenuItem(
+                        value: value,
+                        child: Text(value.toString()),
+                      );
+                    }),
+                    onChanged: (value) => setState(() => _mealsPerDay = value),
+                    validator: (value) =>
+                        value == null ? 'Select meals per day' : null,
+                  ),
+                  const SizedBox(height: 12),
+                  _buildTimeField(
+                    context: context,
+                    label: 'Typical dinner time',
+                    value: _dinnerTime,
+                    onPick: (picked) => setState(() => _dinnerTime = picked),
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    key: ValueKey('caffeine-${_caffeineIntake ?? 'unset'}'),
+                    initialValue: _caffeineIntake,
+                    decoration: const InputDecoration(
+                      labelText: 'Caffeine intake per day',
                     ),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<int>(
-                      key: ValueKey('meals-${_mealsPerDay ?? 'unset'}'),
-                      initialValue: _mealsPerDay,
-                      decoration: const InputDecoration(
-                        labelText: 'Number of main meals per day',
-                      ),
-                      items: List.generate(6, (index) {
-                        final value = index + 1;
-                        return DropdownMenuItem(
-                          value: value,
-                          child: Text(value.toString()),
-                        );
-                      }),
-                      onChanged: (value) =>
-                          setState(() => _mealsPerDay = value),
-                      validator: (value) =>
-                          value == null ? 'Select meals per day' : null,
+                    items: _caffeineOptions
+                        .map(
+                          (option) => DropdownMenuItem(
+                            value: option.value,
+                            child: Text(option.label),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (value) =>
+                        setState(() => _caffeineIntake = value),
+                    validator: (value) =>
+                        value == null ? 'Select caffeine intake' : null,
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    key: ValueKey('alcohol-${_alcoholConsumption ?? 'unset'}'),
+                    initialValue: _alcoholConsumption,
+                    decoration: const InputDecoration(
+                      labelText: 'Alcohol consumption',
                     ),
-                    const SizedBox(height: 12),
-                    _buildTimeField(
-                      context: context,
-                      label: 'Typical dinner time',
-                      value: _dinnerTime,
-                      onPick: (picked) => setState(() => _dinnerTime = picked),
+                    items: _alcoholOptions
+                        .map(
+                          (option) => DropdownMenuItem(
+                            value: option.value,
+                            child: Text(option.label),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (value) =>
+                        setState(() => _alcoholConsumption = value),
+                    validator: (value) =>
+                        value == null ? 'Select alcohol consumption' : null,
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    key: ValueKey('smoking-${_smokingStatus ?? 'unset'}'),
+                    initialValue: _smokingStatus,
+                    decoration: const InputDecoration(
+                      labelText: 'Smoking status',
                     ),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<String>(
-                      key: ValueKey('caffeine-${_caffeineIntake ?? 'unset'}'),
-                      initialValue: _caffeineIntake,
-                      decoration: const InputDecoration(
-                        labelText: 'Caffeine intake per day',
-                      ),
-                      items: _caffeineOptions
-                          .map(
-                            (option) => DropdownMenuItem(
-                              value: option.value,
-                              child: Text(option.label),
-                            ),
-                          )
-                          .toList(),
-                      onChanged: (value) =>
-                          setState(() => _caffeineIntake = value),
-                      validator: (value) =>
-                          value == null ? 'Select caffeine intake' : null,
+                    items: _smokingOptions
+                        .map(
+                          (option) => DropdownMenuItem(
+                            value: option.value,
+                            child: Text(option.label),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (value) =>
+                        setState(() => _smokingStatus = value),
+                    validator: (value) =>
+                        value == null ? 'Select smoking status' : null,
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    key: ValueKey('energy-${_energyLevel ?? 'unset'}'),
+                    initialValue: _energyLevel,
+                    decoration: const InputDecoration(
+                      labelText: 'Perceived energy level throughout the day',
                     ),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<String>(
-                      key: ValueKey(
-                        'alcohol-${_alcoholConsumption ?? 'unset'}',
-                      ),
-                      initialValue: _alcoholConsumption,
-                      decoration: const InputDecoration(
-                        labelText: 'Alcohol consumption',
-                      ),
-                      items: _alcoholOptions
-                          .map(
-                            (option) => DropdownMenuItem(
-                              value: option.value,
-                              child: Text(option.label),
-                            ),
-                          )
-                          .toList(),
-                      onChanged: (value) =>
-                          setState(() => _alcoholConsumption = value),
-                      validator: (value) =>
-                          value == null ? 'Select alcohol consumption' : null,
-                    ),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<String>(
-                      key: ValueKey('smoking-${_smokingStatus ?? 'unset'}'),
-                      initialValue: _smokingStatus,
-                      decoration: const InputDecoration(
-                        labelText: 'Smoking status',
-                      ),
-                      items: _smokingOptions
-                          .map(
-                            (option) => DropdownMenuItem(
-                              value: option.value,
-                              child: Text(option.label),
-                            ),
-                          )
-                          .toList(),
-                      onChanged: (value) =>
-                          setState(() => _smokingStatus = value),
-                      validator: (value) =>
-                          value == null ? 'Select smoking status' : null,
-                    ),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<String>(
-                      key: ValueKey('energy-${_energyLevel ?? 'unset'}'),
-                      initialValue: _energyLevel,
-                      decoration: const InputDecoration(
-                        labelText: 'Perceived energy level throughout the day',
-                      ),
-                      items: _energyLevelOptions
-                          .map(
-                            (option) => DropdownMenuItem(
-                              value: option.value,
-                              child: Text(option.label),
-                            ),
-                          )
-                          .toList(),
-                      onChanged: (value) =>
-                          setState(() => _energyLevel = value),
-                      validator: (value) =>
-                          value == null ? 'Select energy level' : null,
-                    ),
-                    const SizedBox(height: 24),
-                    FilledButton(
-                      onPressed: _handleSubmit,
-                      child: const Text('Continue'),
-                    ),
-                  ],
-                ),
+                    items: _energyLevelOptions
+                        .map(
+                          (option) => DropdownMenuItem(
+                            value: option.value,
+                            child: Text(option.label),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (value) => setState(() => _energyLevel = value),
+                    validator: (value) =>
+                        value == null ? 'Select energy level' : null,
+                  ),
+                  const SizedBox(height: 24),
+                  FilledButton(
+                    onPressed: _handleSubmit,
+                    child: const Text('Continue'),
+                  ),
+                ],
               ),
             ),
           ),
@@ -1932,9 +2057,6 @@ class _LifestyleQuestionnairePageState
 
   Future<void> _handleSubmit() async {
     FocusScope.of(context).unfocus();
-    if (!_submitted) {
-      setState(() => _submitted = true);
-    }
     if (!(_formKey.currentState?.validate() ?? false)) {
       return;
     }
@@ -1955,12 +2077,15 @@ class _LifestyleQuestionnairePageState
       smokingStatus: _smokingStatus!,
       energyLevel: _energyLevel!,
     );
-    final answersMap = answers.toMap();
-    _lifestyleDraft = answersMap;
     final activityOutcome = await Navigator.of(context).push<Object?>(
       MaterialPageRoute(
-        builder: (_) =>
-            _ActivityQuestionnairePage(initialAnswers: _initialActivity),
+        builder: (_) => _ActivityQuestionnairePage(
+          initialAnswers: _initialActivity,
+          initialStressAnswers: _initialStress,
+          initialSleepAnswers: _initialSleep,
+          initialNutritionAnswers: _initialNutrition,
+          initialPsychAnswers: _initialPsych,
+        ),
         fullscreenDialog: true,
       ),
     );
@@ -1969,81 +2094,46 @@ class _LifestyleQuestionnairePageState
       return;
     }
 
-    if (activityOutcome is Map) {
-      final activityDraft = activityOutcome['activityDraft'];
-      if (activityDraft is Map) {
-        setState(() {
-          _initialActivity = activityDraft.map(
-            (key, value) => MapEntry(key.toString(), value),
+    if (activityOutcome is _ActivityNavigationResult) {
+      setState(() {
+        _initialActivity = Map<String, dynamic>.from(activityOutcome.activity);
+        if (activityOutcome.stress != null) {
+          _initialStress = Map<String, dynamic>.from(activityOutcome.stress!);
+        }
+        if (activityOutcome.sleep != null) {
+          _initialSleep = Map<String, dynamic>.from(activityOutcome.sleep!);
+        }
+        if (activityOutcome.nutrition != null) {
+          _initialNutrition = Map<String, dynamic>.from(
+            activityOutcome.nutrition!,
           );
-        });
-      }
+        }
+        if (activityOutcome.psych != null) {
+          _initialPsych = Map<String, dynamic>.from(activityOutcome.psych!);
+        }
+      });
       return;
     }
 
-    if (activityOutcome is! _ActivityAnswers) {
+    if (activityOutcome is! _ActivityFlowResult) {
       return;
     }
 
-    _initialActivity = activityOutcome.toMap();
-    Navigator.of(
-      context,
-    ).pop(_LifestyleFlowResult(lifestyle: answers, activity: activityOutcome));
-  }
+    final activityResult = activityOutcome;
 
-  Map<String, dynamic> _collectLifestyleDraft() {
-    final map = <String, dynamic>{};
-    if (_wakeUpTime != null) {
-      map['wakeUpTime'] = _formatTimeOfDay(_wakeUpTime!);
-    }
-    if (_bedtime != null) {
-      map['bedtime'] = _formatTimeOfDay(_bedtime!);
-    }
-    final rawDuration = _sleepDurationController.text.trim();
-    final parsedDuration = double.tryParse(rawDuration.replaceAll(',', '.'));
-    if (parsedDuration != null && parsedDuration > 0) {
-      map['sleepDurationHours'] = parsedDuration;
-    }
-    map['sleepQuality'] = _sleepQuality;
-    if (_workPattern != null) {
-      map['workPattern'] = _workPattern;
-    }
-    if (_breakfastHabit != null) {
-      map['breakfastHabit'] = _breakfastHabit;
-    }
-    if (_mealsPerDay != null) {
-      map['mealsPerDay'] = _mealsPerDay;
-    }
-    if (_dinnerTime != null) {
-      map['dinnerTime'] = _formatTimeOfDay(_dinnerTime!);
-    }
-    if (_caffeineIntake != null) {
-      map['caffeineIntake'] = _caffeineIntake;
-    }
-    if (_alcoholConsumption != null) {
-      map['alcoholConsumption'] = _alcoholConsumption;
-    }
-    if (_smokingStatus != null) {
-      map['smokingStatus'] = _smokingStatus;
-    }
-    if (_energyLevel != null) {
-      map['energyLevel'] = _energyLevel;
-    }
-    return map;
-  }
+    _initialActivity = activityResult.activity.toMap();
+    _initialStress = activityResult.stressSleep.toStressMapWithLoad();
+    _initialSleep = activityResult.stressSleep.toSleepMap();
+    _initialNutrition = activityResult.stressSleep.toNutritionMap();
+    _initialPsych = activityResult.stressSleep.toPsychMap();
 
-  void _returnDraftToParent() {
-    final currentDraft = _collectLifestyleDraft();
-    final mergedDraft = currentDraft.isNotEmpty
-        ? currentDraft
-        : (_lifestyleDraft != null
-              ? Map<String, dynamic>.from(_lifestyleDraft!)
-              : <String, dynamic>{});
-    final payload = <String, dynamic>{'lifestyleDraft': mergedDraft};
-    if (_initialActivity != null) {
-      payload['activityDraft'] = Map<String, dynamic>.from(_initialActivity!);
-    }
-    Navigator.of(context).pop(payload);
+    Navigator.of(context).pop(
+      _LifestyleFlowResult(
+        lifestyle: answers,
+        activity: activityResult.activity,
+        stressSleep: activityResult.stressSleep,
+      ),
+    );
   }
 }
 
@@ -2101,10 +2191,53 @@ class _ActivityAnswers {
   }
 }
 
+class _StressAnswers {
+  const _StressAnswers({required this.responses});
+
+  final List<int> responses;
+
+  double get normalizedScore {
+    final total = responses.fold<int>(0, (sum, value) => sum + value);
+    return (total / (responses.length * 4)) * 100;
+  }
+
+  Map<String, dynamic> toMap() {
+    return {'items': responses, 'index': normalizedScore};
+  }
+}
+
+class _SleepAnswers {
+  const _SleepAnswers({required this.responses});
+
+  final List<int> responses;
+
+  double get normalizedScore {
+    final total = responses.fold<int>(0, (sum, value) => sum + value);
+    final maxScore = responses.length * 4;
+    if (maxScore == 0) return 0;
+    final inverted = 1 - (total / maxScore);
+    return inverted * 100;
+  }
+
+  Map<String, dynamic> toMap() {
+    return {'items': responses, 'index': normalizedScore};
+  }
+}
+
 class _ActivityQuestionnairePage extends StatefulWidget {
-  const _ActivityQuestionnairePage({this.initialAnswers});
+  const _ActivityQuestionnairePage({
+    this.initialAnswers,
+    this.initialStressAnswers,
+    this.initialSleepAnswers,
+    this.initialNutritionAnswers,
+    this.initialPsychAnswers,
+  });
 
   final Map<String, dynamic>? initialAnswers;
+  final Map<String, dynamic>? initialStressAnswers;
+  final Map<String, dynamic>? initialSleepAnswers;
+  final Map<String, dynamic>? initialNutritionAnswers;
+  final Map<String, dynamic>? initialPsychAnswers;
 
   @override
   State<_ActivityQuestionnairePage> createState() =>
@@ -2125,7 +2258,10 @@ class _ActivityQuestionnairePageState
   int? _vigorousDays;
   int? _moderateDays;
   int? _walkingDays;
-  bool _submitted = false;
+  Map<String, dynamic>? _initialStress;
+  Map<String, dynamic>? _initialSleep;
+  Map<String, dynamic>? _initialNutrition;
+  Map<String, dynamic>? _initialPsych;
 
   @override
   void initState() {
@@ -2144,7 +2280,13 @@ class _ActivityQuestionnairePageState
 
   void _applyInitialAnswers() {
     final data = widget.initialAnswers;
-    if (data == null) return;
+    if (data == null) {
+      _initialStress = widget.initialStressAnswers;
+      _initialSleep = widget.initialSleepAnswers;
+      _initialNutrition = widget.initialNutritionAnswers;
+      _initialPsych = widget.initialPsychAnswers;
+      return;
+    }
     final vigDays = data['vigorousDaysPerWeek'];
     if (vigDays is num) {
       _vigorousDays = vigDays.clamp(0, 7).round();
@@ -2181,6 +2323,10 @@ class _ActivityQuestionnairePageState
         sittingHours % 1 == 0 ? 0 : 1,
       );
     }
+    _initialStress = widget.initialStressAnswers;
+    _initialSleep = widget.initialSleepAnswers;
+    _initialNutrition = widget.initialNutritionAnswers;
+    _initialPsych = widget.initialPsychAnswers;
   }
 
   @override
@@ -2192,11 +2338,11 @@ class _ActivityQuestionnairePageState
         if (didPop) {
           return;
         }
-        _returnDraftToLifestyle();
+        _handleBackToLifestyle();
       },
       child: Scaffold(
         appBar: AppBar(
-          leading: BackButton(onPressed: _returnDraftToLifestyle),
+          leading: BackButton(onPressed: _handleBackToLifestyle),
           title: const Text('Health Profile'),
         ),
         body: KeyboardDismissible(
@@ -2210,7 +2356,7 @@ class _ActivityQuestionnairePageState
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Text(
-                      'Activity & movement',
+                      'Activity & Movement',
                       style: theme.textTheme.headlineSmall,
                     ),
                     const SizedBox(height: 4),
@@ -2281,7 +2427,7 @@ class _ActivityQuestionnairePageState
                     const SizedBox(height: 24),
                     FilledButton(
                       onPressed: _handleSubmit,
-                      child: const Text('Finish'),
+                      child: const Text('Continue'),
                     ),
                   ],
                 ),
@@ -2291,6 +2437,43 @@ class _ActivityQuestionnairePageState
         ),
       ),
     );
+  }
+
+  Map<String, dynamic> _currentActivityMap() {
+    final vigorousMinutes =
+        _parseNonNegative(_vigorousMinutesController.text) ?? 0;
+    final moderateMinutes =
+        _parseNonNegative(_moderateMinutesController.text) ?? 0;
+    final walkingMinutes =
+        _parseNonNegative(_walkingMinutesController.text) ?? 0;
+    final sittingHours = _parseNonNegative(_sittingHoursController.text) ?? 0;
+
+    final hasInput =
+        (_vigorousDays ?? 0) != 0 ||
+        (_moderateDays ?? 0) != 0 ||
+        (_walkingDays ?? 0) != 0 ||
+        vigorousMinutes != 0 ||
+        moderateMinutes != 0 ||
+        walkingMinutes != 0 ||
+        sittingHours != 0;
+
+    if (!hasInput) {
+      final existing = widget.initialAnswers;
+      if (existing != null) {
+        return Map<String, dynamic>.from(existing);
+      }
+    }
+
+    final draft = _ActivityAnswers(
+      vigorousDays: _vigorousDays ?? 0,
+      vigorousMinutes: vigorousMinutes,
+      moderateDays: _moderateDays ?? 0,
+      moderateMinutes: moderateMinutes,
+      walkingDays: _walkingDays ?? 0,
+      walkingMinutes: walkingMinutes,
+      sittingHours: sittingHours,
+    );
+    return draft.toMap();
   }
 
   DropdownButtonFormField<int> _buildDaysDropdown({
@@ -2341,11 +2524,8 @@ class _ActivityQuestionnairePageState
     return parsed;
   }
 
-  void _handleSubmit() {
+  Future<void> _handleSubmit() async {
     FocusScope.of(context).unfocus();
-    if (!_submitted) {
-      setState(() => _submitted = true);
-    }
     if (!(_formKey.currentState?.validate() ?? false)) {
       return;
     }
@@ -2357,7 +2537,7 @@ class _ActivityQuestionnairePageState
         _parseNonNegative(_walkingMinutesController.text) ?? 0;
     final sittingHours = _parseNonNegative(_sittingHoursController.text) ?? 0;
 
-    final answers = _ActivityAnswers(
+    final activityAnswers = _ActivityAnswers(
       vigorousDays: _vigorousDays ?? 0,
       vigorousMinutes: vigorousMinutes,
       moderateDays: _moderateDays ?? 0,
@@ -2366,24 +2546,778 @@ class _ActivityQuestionnairePageState
       walkingMinutes: walkingMinutes,
       sittingHours: sittingHours,
     );
-
-    Navigator.of(context).pop(answers);
-  }
-
-  Map<String, dynamic> _collectActivityDraft() {
-    final draft = _ActivityAnswers(
-      vigorousDays: _vigorousDays ?? 0,
-      vigorousMinutes: _parseNonNegative(_vigorousMinutesController.text) ?? 0,
-      moderateDays: _moderateDays ?? 0,
-      moderateMinutes: _parseNonNegative(_moderateMinutesController.text) ?? 0,
-      walkingDays: _walkingDays ?? 0,
-      walkingMinutes: _parseNonNegative(_walkingMinutesController.text) ?? 0,
-      sittingHours: _parseNonNegative(_sittingHoursController.text) ?? 0,
+    final stressOutcome = await Navigator.of(context).push<Object?>(
+      MaterialPageRoute(
+        builder: (_) => _StressSleepQuestionnairePage(
+          initialStressAnswers: _initialStress,
+          initialSleepAnswers: _initialSleep,
+          initialNutritionAnswers: _initialNutrition,
+          initialPsychAnswers: _initialPsych,
+        ),
+        fullscreenDialog: true,
+      ),
     );
-    return draft.toMap();
+
+    if (!mounted) {
+      return;
+    }
+
+    if (stressOutcome is _StressSleepNavigationResult) {
+      _initialStress = Map<String, dynamic>.from(stressOutcome.stress);
+      _initialSleep = Map<String, dynamic>.from(stressOutcome.sleep);
+      if (stressOutcome.nutrition != null) {
+        _initialNutrition = Map<String, dynamic>.from(stressOutcome.nutrition!);
+      }
+      if (stressOutcome.psych != null) {
+        _initialPsych = Map<String, dynamic>.from(stressOutcome.psych!);
+      }
+      return;
+    }
+
+    if (stressOutcome is! _StressSleepResult) {
+      return;
+    }
+
+    final stressSleepResult = stressOutcome;
+
+    _initialStress = stressSleepResult.toStressMapWithLoad();
+    _initialSleep = stressSleepResult.toSleepMap();
+    _initialNutrition = stressSleepResult.toNutritionMap();
+    _initialPsych = stressSleepResult.toPsychMap();
+
+    Navigator.of(context).pop(
+      _ActivityFlowResult(
+        activity: activityAnswers,
+        stressSleep: stressSleepResult,
+      ),
+    );
   }
 
-  void _returnDraftToLifestyle() {
-    Navigator.of(context).pop({'activityDraft': _collectActivityDraft()});
+  void _handleBackToLifestyle() {
+    final stressCopy = _initialStress != null
+        ? Map<String, dynamic>.from(_initialStress!)
+        : null;
+    final sleepCopy = _initialSleep != null
+        ? Map<String, dynamic>.from(_initialSleep!)
+        : null;
+    final nutritionCopy = _initialNutrition != null
+        ? Map<String, dynamic>.from(_initialNutrition!)
+        : null;
+    final psychCopy = _initialPsych != null
+        ? Map<String, dynamic>.from(_initialPsych!)
+        : null;
+    Navigator.of(context).pop(
+      _ActivityNavigationResult.back(
+        activity: _currentActivityMap(),
+        stress: stressCopy,
+        sleep: sleepCopy,
+        nutrition: nutritionCopy,
+        psych: psychCopy,
+      ),
+    );
+  }
+}
+
+class _StressSleepResult {
+  const _StressSleepResult({
+    required this.stress,
+    required this.sleep,
+    required this.nutrition,
+    required this.psych,
+  });
+
+  final _StressAnswers stress;
+  final _SleepAnswers sleep;
+  final _NutritionResult nutrition;
+  final _PsychResult psych;
+
+  Map<String, dynamic> toStressMap() => stress.toMap();
+  Map<String, dynamic> toStressMapWithLoad() {
+    final map = stress.toMap();
+    map['loadIndex'] = stressLoad;
+    return map;
+  }
+
+  Map<String, dynamic> toSleepMap() => sleep.toMap();
+  Map<String, dynamic> toNutritionMap() => nutrition.toMap();
+  Map<String, dynamic> toPsychMap() => psych.toMap();
+  double get stressLoad =>
+      (stress.normalizedScore * 0.6) + ((100 - sleep.normalizedScore) * 0.4);
+}
+
+class _StressSleepNavigationResult {
+  const _StressSleepNavigationResult.back({
+    required this.stress,
+    required this.sleep,
+    this.nutrition,
+    this.psych,
+  });
+
+  final Map<String, dynamic> stress;
+  final Map<String, dynamic> sleep;
+  final Map<String, dynamic>? nutrition;
+  final Map<String, dynamic>? psych;
+}
+
+class _NutritionAnswers {
+  const _NutritionAnswers({required this.responses});
+
+  final List<int> responses;
+
+  double get index {
+    final total = responses.fold<int>(0, (sum, value) => sum + value);
+    return (total / (responses.length * 4)) * 100;
+  }
+
+  Map<String, dynamic> toMap() {
+    return {'items': responses, 'index': index};
+  }
+}
+
+class _NutritionResult {
+  const _NutritionResult({required this.nutrition});
+
+  final _NutritionAnswers nutrition;
+
+  Map<String, dynamic> toMap() => nutrition.toMap();
+}
+
+class _PsychQuestionnairePage extends StatefulWidget {
+  const _PsychQuestionnairePage({this.initialAnswers});
+
+  final Map<String, dynamic>? initialAnswers;
+
+  @override
+  State<_PsychQuestionnairePage> createState() =>
+      _PsychQuestionnairePageState();
+}
+
+class _PsychQuestionnairePageState extends State<_PsychQuestionnairePage> {
+  final _formKey = GlobalKey<FormState>();
+  final List<int> _responses = List<int>.filled(5, 2);
+
+  static const _prompts = [
+    'Feeling overwhelmed by the demands of diabetes',
+    'Feeling discouraged with your diabetes efforts',
+    'Feeling that you are failing with your diabetes routine',
+    'Feeling angry, scared, or depressed about living with diabetes',
+    'Feeling that you are not sticking closely enough to good meal or testing plans',
+  ];
+
+  static const _optionLabels = [
+    'Not a problem',
+    'Slight problem',
+    'Moderate problem',
+    'Serious problem',
+    'Major problem',
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    final raw = widget.initialAnswers;
+    if (raw is Map) {
+      final map = <String, dynamic>{};
+      (raw as Map).forEach((key, value) {
+        map[key.toString()] = value;
+      });
+      final itemsRaw = map['items'];
+      if (itemsRaw is List) {
+        final items = itemsRaw
+            .map((e) => int.tryParse(e.toString()) ?? 0)
+            .toList();
+        for (var i = 0; i < _responses.length && i < items.length; i++) {
+          _responses[i] = items[i].clamp(0, 4);
+        }
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) {
+          return;
+        }
+        _handleBackToNutrition();
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          leading: BackButton(onPressed: _handleBackToNutrition),
+          title: const Text('Health Profile'),
+        ),
+        body: KeyboardDismissible(
+          child: SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              child: Form(
+                key: _formKey,
+                autovalidateMode: AutovalidateMode.onUserInteraction,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      'Emotional wellbeing',
+                      style: theme.textTheme.headlineSmall,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'How have you felt about diabetes recently?',
+                      style: theme.textTheme.bodyMedium,
+                    ),
+                    const SizedBox(height: 16),
+                    ...List.generate(_responses.length, (index) {
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: _buildQuestion(index, theme),
+                      );
+                    }),
+                    const SizedBox(height: 24),
+                    FilledButton(
+                      onPressed: _handleSubmit,
+                      child: const Text('Finish'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQuestion(int index, ThemeData theme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(_prompts[index], style: theme.textTheme.bodyLarge),
+        const SizedBox(height: 6),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: List.generate(_optionLabels.length, (value) {
+            final selected = _responses[index] == value;
+            return ChoiceChip(
+              label: Text(_optionLabels[value]),
+              selected: selected,
+              onSelected: (_) => setState(() {
+                _responses[index] = value;
+              }),
+            );
+          }),
+        ),
+      ],
+    );
+  }
+
+  void _handleBackToNutrition() {
+    Navigator.of(context).pop(
+      _PsychNavigationResult.backToNutrition(
+        responses: List<int>.from(_responses),
+      ),
+    );
+  }
+
+  void _handleSubmit() {
+    FocusScope.of(context).unfocus();
+    final result = _PsychResult(responses: List<int>.from(_responses));
+    Navigator.of(context).pop(result);
+  }
+}
+
+class _PsychResult {
+  const _PsychResult({required this.responses});
+
+  final List<int> responses;
+
+  double get distressIndex {
+    final total = responses.fold<int>(0, (sum, value) => sum + value);
+    return (total / (responses.length * 4)) * 100;
+  }
+
+  bool get supportNeeded => distressIndex > 60;
+
+  Map<String, dynamic> toMap() {
+    return {
+      'items': responses,
+      'index': distressIndex,
+      'supportNeeded': supportNeeded,
+    };
+  }
+}
+
+class _PsychNavigationResult {
+  const _PsychNavigationResult.backToNutrition({required this.responses})
+    : goBackToNutrition = true;
+
+  final bool goBackToNutrition;
+  final List<int> responses;
+}
+
+class _NutritionQuestionnairePage extends StatefulWidget {
+  const _NutritionQuestionnairePage({this.initialAnswers});
+
+  final Map<String, dynamic>? initialAnswers;
+
+  @override
+  State<_NutritionQuestionnairePage> createState() =>
+      _NutritionQuestionnairePageState();
+}
+
+class _NutritionQuestionnairePageState
+    extends State<_NutritionQuestionnairePage> {
+  final _formKey = GlobalKey<FormState>();
+  final List<int> _responses = List<int>.filled(7, 2);
+
+  static const _nutritionPrompts = [
+    'Daily fruit and vegetable servings',
+    'Whole grain servings per day',
+    'Frequency of fried or high-fat foods',
+    'Sugary drinks per week',
+    'Eating dinner within 2 hours of bedtime',
+    'Fast food or takeout frequency',
+    'Processed snack intake',
+  ];
+
+  static const _optionLabels = [
+    'Never / rarely',
+    '1–2 times',
+    '3–4 times',
+    '5–6 times',
+    'Daily / most days',
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    final data = widget.initialAnswers;
+    if (data is Map<String, dynamic> && data['items'] is List) {
+      final items = (data['items'] as List)
+          .map((e) => int.tryParse(e.toString()) ?? 0)
+          .toList();
+      for (var i = 0; i < _responses.length && i < items.length; i++) {
+        _responses[i] = items[i].clamp(0, 4);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Scaffold(
+      appBar: AppBar(
+        leading: BackButton(onPressed: () => Navigator.of(context).pop()),
+        title: const Text('Health Profile'),
+      ),
+      body: KeyboardDismissible(
+        child: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            child: Form(
+              key: _formKey,
+              autovalidateMode: AutovalidateMode.onUserInteraction,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    'Nutrition patterns',
+                    style: theme.textTheme.headlineSmall,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    "Tell us about your usual food choices.",
+                    style: theme.textTheme.bodyMedium,
+                  ),
+                  const SizedBox(height: 16),
+                  ...List.generate(_responses.length, (index) {
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: _buildNutritionQuestion(index, theme),
+                    );
+                  }),
+                  const SizedBox(height: 24),
+                  FilledButton(
+                    onPressed: _handleSubmit,
+                    child: const Text('Continue'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNutritionQuestion(int index, ThemeData theme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(_nutritionPrompts[index], style: theme.textTheme.bodyLarge),
+        const SizedBox(height: 6),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: List.generate(_optionLabels.length, (value) {
+            final selected = _responses[index] == value;
+            return ChoiceChip(
+              label: Text(_optionLabels[value]),
+              selected: selected,
+              onSelected: (_) => setState(() {
+                _responses[index] = value;
+              }),
+            );
+          }),
+        ),
+      ],
+    );
+  }
+
+  void _handleSubmit() {
+    FocusScope.of(context).unfocus();
+    final result = _NutritionResult(
+      nutrition: _NutritionAnswers(responses: List<int>.from(_responses)),
+    );
+    Navigator.of(context).pop(result);
+  }
+}
+
+class _StressSleepQuestionnairePage extends StatefulWidget {
+  const _StressSleepQuestionnairePage({
+    this.initialStressAnswers,
+    this.initialSleepAnswers,
+    this.initialNutritionAnswers,
+    this.initialPsychAnswers,
+  });
+
+  final Map<String, dynamic>? initialStressAnswers;
+  final Map<String, dynamic>? initialSleepAnswers;
+  final Map<String, dynamic>? initialNutritionAnswers;
+  final Map<String, dynamic>? initialPsychAnswers;
+
+  @override
+  State<_StressSleepQuestionnairePage> createState() =>
+      _StressSleepQuestionnairePageState();
+}
+
+class _StressSleepQuestionnairePageState
+    extends State<_StressSleepQuestionnairePage> {
+  final _formKey = GlobalKey<FormState>();
+
+  final List<int> _stressResponses = List<int>.filled(4, 0);
+  final List<int> _sleepResponses = List<int>.filled(7, 0);
+  Map<String, dynamic>? _initialNutrition;
+  Map<String, dynamic>? _initialPsych;
+
+  static const _stressPrompts = [
+    'Felt unable to control important things?',
+    'Felt confident about handling personal problems?',
+    'Felt things were going your way?',
+    'Felt difficulties were piling up too high?',
+  ];
+
+  static const _sleepPrompts = [
+    'Difficulty falling asleep',
+    'Difficulty staying asleep',
+    'Problems waking too early',
+    'Sleep satisfaction',
+    'Sleep problems interfering with daily life',
+    'Noticeability of sleep problems to others',
+    'Worry about current sleep difficulties',
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _applyInitialAnswers();
+  }
+
+  void _applyInitialAnswers() {
+    final stressRaw = widget.initialStressAnswers;
+    if (stressRaw is Map) {
+      final stress = Map<String, dynamic>.from(stressRaw as Map);
+      final itemsRaw = stress['items'];
+      if (itemsRaw is List) {
+        final items = itemsRaw
+            .map((e) => int.tryParse(e.toString()) ?? 0)
+            .toList();
+        for (var i = 0; i < _stressResponses.length && i < items.length; i++) {
+          _stressResponses[i] = items[i].clamp(0, 4);
+        }
+      }
+    }
+    final sleepRaw = widget.initialSleepAnswers;
+    if (sleepRaw is Map) {
+      final sleep = Map<String, dynamic>.from(sleepRaw as Map);
+      final itemsRaw = sleep['items'];
+      if (itemsRaw is List) {
+        final items = itemsRaw
+            .map((e) => int.tryParse(e.toString()) ?? 0)
+            .toList();
+        for (var i = 0; i < _sleepResponses.length && i < items.length; i++) {
+          _sleepResponses[i] = items[i].clamp(0, 4);
+        }
+      }
+    }
+    final nutritionRaw = widget.initialNutritionAnswers;
+    if (nutritionRaw is Map) {
+      final nutrition = <String, dynamic>{};
+      (nutritionRaw as Map).forEach((key, value) {
+        nutrition[key.toString()] = value;
+      });
+      _initialNutrition = nutrition;
+    }
+    final psychRaw = widget.initialPsychAnswers;
+    if (psychRaw is Map) {
+      final psych = <String, dynamic>{};
+      (psychRaw as Map).forEach((key, value) {
+        psych[key.toString()] = value;
+      });
+      _initialPsych = psych;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) {
+          return;
+        }
+        _handleBackToActivity();
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          leading: BackButton(onPressed: _handleBackToActivity),
+          title: const Text('Health Profile'),
+        ),
+        body: KeyboardDismissible(
+          child: SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              child: Form(
+                key: _formKey,
+                autovalidateMode: AutovalidateMode.onUserInteraction,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      'Stress & Sleep',
+                      style: theme.textTheme.headlineSmall,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Share how stress and sleep feel over the past few weeks.',
+                      style: theme.textTheme.bodyMedium,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Perceived Stress (last month)',
+                      style: theme.textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 8),
+                    ...List.generate(_stressResponses.length, (index) {
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: _buildStressQuestion(index),
+                      );
+                    }),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Sleep quality (past 2 weeks)',
+                      style: theme.textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 8),
+                    ...List.generate(_sleepResponses.length, (index) {
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: _buildSleepQuestion(index),
+                      );
+                    }),
+                    const SizedBox(height: 24),
+                    FilledButton(
+                      onPressed: _handleSubmit,
+                      child: const Text('Continue'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _handleBackToActivity() {
+    final stressAnswers = _StressAnswers(
+      responses: List<int>.from(_stressResponses),
+    );
+    final sleepAnswers = _SleepAnswers(
+      responses: List<int>.from(_sleepResponses),
+    );
+    final stressMap = stressAnswers.toMap()
+      ..['loadIndex'] = _computeStressLoad(stressAnswers, sleepAnswers);
+    final sleepMap = sleepAnswers.toMap();
+    final nutritionCopy = _initialNutrition != null
+        ? Map<String, dynamic>.from(_initialNutrition!)
+        : null;
+    final psychCopy = _initialPsych != null
+        ? Map<String, dynamic>.from(_initialPsych!)
+        : null;
+    Navigator.of(context).pop(
+      _StressSleepNavigationResult.back(
+        stress: stressMap,
+        sleep: sleepMap,
+        nutrition: nutritionCopy,
+        psych: psychCopy,
+      ),
+    );
+  }
+
+  double _computeStressLoad(
+    _StressAnswers stressAnswers,
+    _SleepAnswers sleepAnswers,
+  ) {
+    return (stressAnswers.normalizedScore * 0.6) +
+        ((100 - sleepAnswers.normalizedScore) * 0.4);
+  }
+
+  Widget _buildStressQuestion(int index) {
+    final options = const [
+      'Never',
+      'Almost never',
+      'Sometimes',
+      'Fairly often',
+      'Very often',
+    ];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(_stressPrompts[index]),
+        const SizedBox(height: 4),
+        Wrap(
+          spacing: 8,
+          children: List.generate(options.length, (value) {
+            final selected = _stressResponses[index] == value;
+            return ChoiceChip(
+              label: Text(options[value]),
+              selected: selected,
+              onSelected: (_) => setState(() {
+                _stressResponses[index] = value;
+              }),
+            );
+          }),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSleepQuestion(int index) {
+    final options = List<String>.generate(5, (value) => value.toString());
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(_sleepPrompts[index]),
+        const SizedBox(height: 4),
+        Wrap(
+          spacing: 8,
+          children: List.generate(options.length, (value) {
+            final selected = _sleepResponses[index] == value;
+            return ChoiceChip(
+              label: Text(value.toString()),
+              selected: selected,
+              onSelected: (_) => setState(() {
+                _sleepResponses[index] = value;
+              }),
+            );
+          }),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _handleSubmit() async {
+    FocusScope.of(context).unfocus();
+    final stress = _StressAnswers(responses: List<int>.from(_stressResponses));
+    final sleep = _SleepAnswers(responses: List<int>.from(_sleepResponses));
+
+    final firstNutritionResult = await Navigator.of(context)
+        .push<_NutritionResult>(
+          MaterialPageRoute(
+            builder: (_) =>
+                _NutritionQuestionnairePage(initialAnswers: _initialNutrition),
+            fullscreenDialog: true,
+          ),
+        );
+
+    if (!mounted || firstNutritionResult == null) {
+      return;
+    }
+
+    _initialNutrition = firstNutritionResult.toMap();
+
+    var currentNutritionResult = firstNutritionResult;
+
+    Map<String, dynamic>? psychInitialAnswers = _initialPsych;
+
+    while (mounted) {
+      final psychOutcome = await Navigator.of(context).push<Object?>(
+        MaterialPageRoute(
+          builder: (_) =>
+              _PsychQuestionnairePage(initialAnswers: psychInitialAnswers),
+          fullscreenDialog: true,
+        ),
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      if (psychOutcome is _PsychResult) {
+        _initialPsych = psychOutcome.toMap();
+        Navigator.of(context).pop(
+          _StressSleepResult(
+            stress: stress,
+            sleep: sleep,
+            nutrition: currentNutritionResult,
+            psych: psychOutcome,
+          ),
+        );
+        return;
+      }
+
+      if (psychOutcome is _PsychNavigationResult &&
+          psychOutcome.goBackToNutrition) {
+        psychInitialAnswers = {'items': List<int>.from(psychOutcome.responses)};
+        _initialPsych = psychInitialAnswers;
+
+        final updatedNutrition = await Navigator.of(context)
+            .push<_NutritionResult>(
+              MaterialPageRoute(
+                builder: (_) => _NutritionQuestionnairePage(
+                  initialAnswers: _initialNutrition,
+                ),
+                fullscreenDialog: true,
+              ),
+            );
+
+        if (!mounted || updatedNutrition == null) {
+          return;
+        }
+
+        currentNutritionResult = updatedNutrition;
+        _initialNutrition = updatedNutrition.toMap();
+        continue;
+      }
+
+      return;
+    }
   }
 }
