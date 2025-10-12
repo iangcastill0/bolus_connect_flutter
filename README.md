@@ -17,4 +17,4 @@ samples, guidance on mobile development, and a full API reference.
 
 
 to build and deploy to testflight run:
-# fastlane beta
+# cd ios && bundle exec fastlane ios beta  
