@@ -123,8 +123,12 @@ class _BolusPageState extends State<BolusPage> {
     }
   }
 
-  void _reset() {
+  void _dismissKeyboard() {
     FocusScope.of(context).unfocus();
+  }
+
+  void _reset() {
+    _dismissKeyboard();
     setState(() {
       _carbBolus = null;
       _corrBolus = null;
@@ -271,7 +275,7 @@ class _BolusPageState extends State<BolusPage> {
     double roundTo(double value, double step) => (value / step).round() * step;
     final roundedTotal = roundTo(total, 0.1);
 
-    FocusScope.of(context).unfocus();
+    _dismissKeyboard();
 
     setState(() {
       _carbBolus = carbBolus;
@@ -506,6 +510,7 @@ class _BolusPageState extends State<BolusPage> {
                   hintText: isMmol ? 'e.g. 6.1' : 'e.g. 140',
                   prefixIcon: const Icon(Icons.bloodtype_outlined),
                 ),
+                onTapOutside: (_) => _dismissKeyboard(),
                 validator: (v) => _validateOptionalPositive(v, 'Glucose level'),
               ),
               if (_trendChoices.isNotEmpty) ...[
@@ -550,6 +555,7 @@ class _BolusPageState extends State<BolusPage> {
                   hintText: 'e.g. 45',
                   prefixIcon: Icon(Icons.restaurant_outlined),
                 ),
+                onTapOutside: (_) => _dismissKeyboard(),
                 validator: (v) => _validateOptionalPositive(v, 'Carbohydrates'),
               ),
               const SizedBox(height: 8),
@@ -565,6 +571,7 @@ class _BolusPageState extends State<BolusPage> {
                   contentPadding:
                       EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 ),
+                onTapOutside: (_) => _dismissKeyboard(),
               ),
               const SizedBox(height: 8),
               SizedBox(
@@ -655,14 +662,7 @@ class _BolusPageState extends State<BolusPage> {
               Positioned.fill(
                 child: GestureDetector(
                   behavior: HitTestBehavior.translucent,
-                  onTap: () {
-                    final primaryFocus = FocusManager.instance.primaryFocus;
-                    if (primaryFocus != null) {
-                      primaryFocus.unfocus();
-                      return;
-                    }
-                    _reset();
-                  },
+                  onTap: _reset,
                   child: const SizedBox.expand(),
                 ),
               ),
