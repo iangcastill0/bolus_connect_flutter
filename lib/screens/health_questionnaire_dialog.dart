@@ -1214,6 +1214,11 @@ class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
           initialSleepAnswers: _initialSleep,
           initialNutritionAnswers: _initialNutrition,
           initialPsychAnswers: _initialPsych,
+          onLifestyleSaved: _saveLifestyleDraft,
+          onActivitySaved: _saveActivityDraft,
+          onStressSleepSaved: _saveStressSleepDraft,
+          onNutritionSaved: _saveNutritionDraft,
+          onPsychSaved: _savePsychDraft,
         ),
         fullscreenDialog: true,
       ),
@@ -1224,6 +1229,103 @@ class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
     }
 
     await _finalizeQuestionnaire(flowResult);
+  }
+
+  Future<void> _saveLifestyleDraft(Map<String, dynamic> lifestyle) async {
+    final copy = Map<String, dynamic>.from(lifestyle);
+    _initialLifestyle = copy;
+    await _persistBaselineDraft(lifestyle: copy);
+  }
+
+  Future<void> _saveActivityDraft(Map<String, dynamic> activity) async {
+    final activityCopy = Map<String, dynamic>.from(activity);
+    _initialActivity = activityCopy;
+    final container = <String, dynamic>{
+      'ipaq': Map<String, dynamic>.from(activityCopy),
+    };
+    await _persistBaselineDraft(activity: container);
+  }
+
+  Future<void> _saveStressSleepDraft(
+    Map<String, dynamic> stress,
+    Map<String, dynamic> sleep,
+  ) async {
+    final stressCopy = Map<String, dynamic>.from(stress);
+    final sleepCopy = Map<String, dynamic>.from(sleep);
+    _initialStress = stressCopy;
+    _initialSleep = sleepCopy;
+    await _persistBaselineDraft(
+      stress: stressCopy,
+      sleep: sleepCopy,
+    );
+  }
+
+  Future<void> _saveNutritionDraft(Map<String, dynamic> nutrition) async {
+    final nutritionCopy = Map<String, dynamic>.from(nutrition);
+    _initialNutrition = nutritionCopy;
+    await _persistBaselineDraft(nutrition: nutritionCopy);
+  }
+
+  Future<void> _savePsychDraft(Map<String, dynamic> psych) async {
+    final psychCopy = Map<String, dynamic>.from(psych);
+    _initialPsych = psychCopy;
+    await _persistBaselineDraft(psych: psychCopy);
+  }
+
+  Future<void> _persistBaselineDraft({
+    Map<String, dynamic>? lifestyle,
+    Map<String, dynamic>? activity,
+    Map<String, dynamic>? stress,
+    Map<String, dynamic>? sleep,
+    Map<String, dynamic>? nutrition,
+    Map<String, dynamic>? psych,
+  }) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      return;
+    }
+    final updated = Map<String, dynamic>.from(_draftAnswers);
+    final baselineRaw = updated['baseline'];
+    final baseline = baselineRaw is Map<String, dynamic>
+        ? Map<String, dynamic>.from(baselineRaw)
+        : <String, dynamic>{};
+
+    void writeSection(String key, Map<String, dynamic>? value) {
+      if (value != null) {
+        baseline[key] = Map<String, dynamic>.from(value);
+      }
+    }
+
+    writeSection('lifestyle', lifestyle);
+    writeSection('activity', activity);
+    writeSection('stress', stress);
+    writeSection('sleep', sleep);
+    writeSection('nutrition', nutrition);
+    writeSection('psych', psych);
+
+    updated['baseline'] = baseline;
+
+    if (nutrition != null || psych != null) {
+      final metricsRaw = updated['metrics'];
+      final metrics = metricsRaw is Map<String, dynamic>
+          ? Map<String, dynamic>.from(metricsRaw)
+          : <String, dynamic>{};
+      if (nutrition != null && nutrition['index'] != null) {
+        metrics['nutrition'] = {'index': nutrition['index']};
+      }
+      if (psych != null && psych['index'] != null) {
+        metrics['psych'] = {'index': psych['index']};
+      }
+      updated['metrics'] = metrics;
+    }
+
+    updated['updatedAt'] = DateTime.now().toIso8601String();
+    _draftAnswers = updated;
+
+    await HealthQuestionnaireService.saveAnswersForUser(
+      user.uid,
+      Map<String, dynamic>.from(updated),
+    );
   }
 
   Future<void> _finalizeQuestionnaire(_LifestyleFlowResult flow) async {
@@ -1663,6 +1765,11 @@ class _LifestyleQuestionnairePage extends StatefulWidget {
     this.initialSleepAnswers,
     this.initialNutritionAnswers,
     this.initialPsychAnswers,
+    this.onLifestyleSaved,
+    this.onActivitySaved,
+    this.onStressSleepSaved,
+    this.onNutritionSaved,
+    this.onPsychSaved,
   });
 
   final Map<String, dynamic>? initialAnswers;
@@ -1671,6 +1778,14 @@ class _LifestyleQuestionnairePage extends StatefulWidget {
   final Map<String, dynamic>? initialSleepAnswers;
   final Map<String, dynamic>? initialNutritionAnswers;
   final Map<String, dynamic>? initialPsychAnswers;
+  final Future<void> Function(Map<String, dynamic> lifestyle)? onLifestyleSaved;
+  final Future<void> Function(Map<String, dynamic> activity)? onActivitySaved;
+  final Future<void> Function(
+    Map<String, dynamic> stress,
+    Map<String, dynamic> sleep,
+  )? onStressSleepSaved;
+  final Future<void> Function(Map<String, dynamic> nutrition)? onNutritionSaved;
+  final Future<void> Function(Map<String, dynamic> psych)? onPsychSaved;
 
   @override
   State<_LifestyleQuestionnairePage> createState() =>
@@ -1694,7 +1809,6 @@ class _LifestyleQuestionnairePageState
   String? _alcoholConsumption;
   String? _smokingStatus;
   String? _energyLevel;
-  Map<String, dynamic>? _initialLifestyle;
   Map<String, dynamic>? _initialActivity;
   Map<String, dynamic>? _initialStress;
   Map<String, dynamic>? _initialSleep;
@@ -1716,7 +1830,6 @@ class _LifestyleQuestionnairePageState
   void _applyInitialAnswers() {
     final data = widget.initialAnswers;
     if (data == null) {
-      _initialLifestyle = null;
       _initialActivity = widget.initialActivityAnswers;
       _initialStress = widget.initialStressAnswers;
       _initialSleep = widget.initialSleepAnswers;
@@ -1724,7 +1837,6 @@ class _LifestyleQuestionnairePageState
       _initialPsych = widget.initialPsychAnswers;
       return;
     }
-    _initialLifestyle = Map<String, dynamic>.from(data);
     _wakeUpTime = _parseTimeOfDay(data['wakeUpTime']?.toString());
     _bedtime = _parseTimeOfDay(data['bedtime']?.toString());
     _dinnerTime = _parseTimeOfDay(data['dinnerTime']?.toString());
@@ -2077,6 +2189,15 @@ class _LifestyleQuestionnairePageState
       smokingStatus: _smokingStatus!,
       energyLevel: _energyLevel!,
     );
+    final lifestyleMap = answers.toMap();
+    if (widget.onLifestyleSaved != null) {
+      await widget.onLifestyleSaved!(
+        Map<String, dynamic>.from(lifestyleMap),
+      );
+      if (!mounted) {
+        return;
+      }
+    }
     final activityOutcome = await Navigator.of(context).push<Object?>(
       MaterialPageRoute(
         builder: (_) => _ActivityQuestionnairePage(
@@ -2085,6 +2206,10 @@ class _LifestyleQuestionnairePageState
           initialSleepAnswers: _initialSleep,
           initialNutritionAnswers: _initialNutrition,
           initialPsychAnswers: _initialPsych,
+          onActivitySaved: widget.onActivitySaved,
+          onStressSleepSaved: widget.onStressSleepSaved,
+          onNutritionSaved: widget.onNutritionSaved,
+          onPsychSaved: widget.onPsychSaved,
         ),
         fullscreenDialog: true,
       ),
@@ -2095,21 +2220,69 @@ class _LifestyleQuestionnairePageState
     }
 
     if (activityOutcome is _ActivityNavigationResult) {
+      final activityMap =
+          Map<String, dynamic>.from(activityOutcome.activity);
+      final stressMap = activityOutcome.stress != null
+          ? Map<String, dynamic>.from(activityOutcome.stress!)
+          : null;
+      final sleepMap = activityOutcome.sleep != null
+          ? Map<String, dynamic>.from(activityOutcome.sleep!)
+          : null;
+      final nutritionMap = activityOutcome.nutrition != null
+          ? Map<String, dynamic>.from(activityOutcome.nutrition!)
+          : null;
+      final psychMap = activityOutcome.psych != null
+          ? Map<String, dynamic>.from(activityOutcome.psych!)
+          : null;
+
+      if (widget.onActivitySaved != null) {
+        await widget.onActivitySaved!(Map<String, dynamic>.from(activityMap));
+        if (!mounted) {
+          return;
+        }
+      }
+      if (stressMap != null && sleepMap != null &&
+          widget.onStressSleepSaved != null) {
+        await widget.onStressSleepSaved!(
+          Map<String, dynamic>.from(stressMap),
+          Map<String, dynamic>.from(sleepMap),
+        );
+        if (!mounted) {
+          return;
+        }
+      }
+      if (nutritionMap != null && widget.onNutritionSaved != null) {
+        await widget.onNutritionSaved!(
+          Map<String, dynamic>.from(nutritionMap),
+        );
+        if (!mounted) {
+          return;
+        }
+      }
+      if (psychMap != null && widget.onPsychSaved != null) {
+        await widget.onPsychSaved!(Map<String, dynamic>.from(psychMap));
+        if (!mounted) {
+          return;
+        }
+      }
+
+      if (!mounted) {
+        return;
+      }
+
       setState(() {
-        _initialActivity = Map<String, dynamic>.from(activityOutcome.activity);
-        if (activityOutcome.stress != null) {
-          _initialStress = Map<String, dynamic>.from(activityOutcome.stress!);
+        _initialActivity = activityMap;
+        if (stressMap != null) {
+          _initialStress = stressMap;
         }
-        if (activityOutcome.sleep != null) {
-          _initialSleep = Map<String, dynamic>.from(activityOutcome.sleep!);
+        if (sleepMap != null) {
+          _initialSleep = sleepMap;
         }
-        if (activityOutcome.nutrition != null) {
-          _initialNutrition = Map<String, dynamic>.from(
-            activityOutcome.nutrition!,
-          );
+        if (nutritionMap != null) {
+          _initialNutrition = nutritionMap;
         }
-        if (activityOutcome.psych != null) {
-          _initialPsych = Map<String, dynamic>.from(activityOutcome.psych!);
+        if (psychMap != null) {
+          _initialPsych = psychMap;
         }
       });
       return;
@@ -2121,11 +2294,38 @@ class _LifestyleQuestionnairePageState
 
     final activityResult = activityOutcome;
 
-    _initialActivity = activityResult.activity.toMap();
-    _initialStress = activityResult.stressSleep.toStressMapWithLoad();
-    _initialSleep = activityResult.stressSleep.toSleepMap();
-    _initialNutrition = activityResult.stressSleep.toNutritionMap();
-    _initialPsych = activityResult.stressSleep.toPsychMap();
+    final activityMap = activityResult.activity.toMap();
+    final stressMap = activityResult.stressSleep.toStressMapWithLoad();
+    final sleepMap = activityResult.stressSleep.toSleepMap();
+    final nutritionMap = activityResult.stressSleep.toNutritionMap();
+    final psychMap = activityResult.stressSleep.toPsychMap();
+
+    _initialActivity = activityMap;
+    _initialStress = stressMap;
+    _initialSleep = sleepMap;
+    _initialNutrition = nutritionMap;
+    _initialPsych = psychMap;
+
+    if (widget.onActivitySaved != null) {
+      await widget.onActivitySaved!(Map<String, dynamic>.from(activityMap));
+    }
+    if (widget.onStressSleepSaved != null) {
+      await widget.onStressSleepSaved!(
+        Map<String, dynamic>.from(stressMap),
+        Map<String, dynamic>.from(sleepMap),
+      );
+      if (!mounted) {
+        return;
+      }
+    }
+    if (widget.onNutritionSaved != null) {
+      await widget.onNutritionSaved!(
+        Map<String, dynamic>.from(nutritionMap),
+      );
+    }
+    if (widget.onPsychSaved != null) {
+      await widget.onPsychSaved!(Map<String, dynamic>.from(psychMap));
+    }
 
     Navigator.of(context).pop(
       _LifestyleFlowResult(
@@ -2231,6 +2431,10 @@ class _ActivityQuestionnairePage extends StatefulWidget {
     this.initialSleepAnswers,
     this.initialNutritionAnswers,
     this.initialPsychAnswers,
+    this.onActivitySaved,
+    this.onStressSleepSaved,
+    this.onNutritionSaved,
+    this.onPsychSaved,
   });
 
   final Map<String, dynamic>? initialAnswers;
@@ -2238,6 +2442,13 @@ class _ActivityQuestionnairePage extends StatefulWidget {
   final Map<String, dynamic>? initialSleepAnswers;
   final Map<String, dynamic>? initialNutritionAnswers;
   final Map<String, dynamic>? initialPsychAnswers;
+  final Future<void> Function(Map<String, dynamic> activity)? onActivitySaved;
+  final Future<void> Function(
+    Map<String, dynamic> stress,
+    Map<String, dynamic> sleep,
+  )? onStressSleepSaved;
+  final Future<void> Function(Map<String, dynamic> nutrition)? onNutritionSaved;
+  final Future<void> Function(Map<String, dynamic> psych)? onPsychSaved;
 
   @override
   State<_ActivityQuestionnairePage> createState() =>
@@ -2546,6 +2757,13 @@ class _ActivityQuestionnairePageState
       walkingMinutes: walkingMinutes,
       sittingHours: sittingHours,
     );
+    final activityMap = activityAnswers.toMap();
+    if (widget.onActivitySaved != null) {
+      await widget.onActivitySaved!(Map<String, dynamic>.from(activityMap));
+      if (!mounted) {
+        return;
+      }
+    }
     final stressOutcome = await Navigator.of(context).push<Object?>(
       MaterialPageRoute(
         builder: (_) => _StressSleepQuestionnairePage(
@@ -2553,6 +2771,9 @@ class _ActivityQuestionnairePageState
           initialSleepAnswers: _initialSleep,
           initialNutritionAnswers: _initialNutrition,
           initialPsychAnswers: _initialPsych,
+          onStressSleepSaved: widget.onStressSleepSaved,
+          onNutritionSaved: widget.onNutritionSaved,
+          onPsychSaved: widget.onPsychSaved,
         ),
         fullscreenDialog: true,
       ),
@@ -2563,13 +2784,46 @@ class _ActivityQuestionnairePageState
     }
 
     if (stressOutcome is _StressSleepNavigationResult) {
-      _initialStress = Map<String, dynamic>.from(stressOutcome.stress);
-      _initialSleep = Map<String, dynamic>.from(stressOutcome.sleep);
-      if (stressOutcome.nutrition != null) {
-        _initialNutrition = Map<String, dynamic>.from(stressOutcome.nutrition!);
+      final stressMap = Map<String, dynamic>.from(stressOutcome.stress);
+      final sleepMap = Map<String, dynamic>.from(stressOutcome.sleep);
+      final nutritionMap = stressOutcome.nutrition != null
+          ? Map<String, dynamic>.from(stressOutcome.nutrition!)
+          : null;
+      final psychMap = stressOutcome.psych != null
+          ? Map<String, dynamic>.from(stressOutcome.psych!)
+          : null;
+
+      if (widget.onStressSleepSaved != null) {
+        await widget.onStressSleepSaved!(
+          Map<String, dynamic>.from(stressMap),
+          Map<String, dynamic>.from(sleepMap),
+        );
+        if (!mounted) {
+          return;
+        }
       }
-      if (stressOutcome.psych != null) {
-        _initialPsych = Map<String, dynamic>.from(stressOutcome.psych!);
+      if (nutritionMap != null && widget.onNutritionSaved != null) {
+        await widget.onNutritionSaved!(
+          Map<String, dynamic>.from(nutritionMap),
+        );
+        if (!mounted) {
+          return;
+        }
+      }
+      if (psychMap != null && widget.onPsychSaved != null) {
+        await widget.onPsychSaved!(Map<String, dynamic>.from(psychMap));
+        if (!mounted) {
+          return;
+        }
+      }
+
+      _initialStress = stressMap;
+      _initialSleep = sleepMap;
+      if (nutritionMap != null) {
+        _initialNutrition = nutritionMap;
+      }
+      if (psychMap != null) {
+        _initialPsych = psychMap;
       }
       return;
     }
@@ -2580,10 +2834,39 @@ class _ActivityQuestionnairePageState
 
     final stressSleepResult = stressOutcome;
 
-    _initialStress = stressSleepResult.toStressMapWithLoad();
-    _initialSleep = stressSleepResult.toSleepMap();
-    _initialNutrition = stressSleepResult.toNutritionMap();
-    _initialPsych = stressSleepResult.toPsychMap();
+    final stressMap = stressSleepResult.toStressMapWithLoad();
+    final sleepMap = stressSleepResult.toSleepMap();
+    final nutritionMap = stressSleepResult.toNutritionMap();
+    final psychMap = stressSleepResult.toPsychMap();
+
+    _initialStress = stressMap;
+    _initialSleep = sleepMap;
+    _initialNutrition = nutritionMap;
+    _initialPsych = psychMap;
+
+    if (widget.onStressSleepSaved != null) {
+      await widget.onStressSleepSaved!(
+        Map<String, dynamic>.from(stressMap),
+        Map<String, dynamic>.from(sleepMap),
+      );
+      if (!mounted) {
+        return;
+      }
+    }
+    if (widget.onNutritionSaved != null) {
+      await widget.onNutritionSaved!(
+        Map<String, dynamic>.from(nutritionMap),
+      );
+      if (!mounted) {
+        return;
+      }
+    }
+    if (widget.onPsychSaved != null) {
+      await widget.onPsychSaved!(Map<String, dynamic>.from(psychMap));
+      if (!mounted) {
+        return;
+      }
+    }
 
     Navigator.of(context).pop(
       _ActivityFlowResult(
@@ -2682,10 +2965,20 @@ class _NutritionResult {
   Map<String, dynamic> toMap() => nutrition.toMap();
 }
 
+class _NutritionNavigationResult {
+  const _NutritionNavigationResult.back({required this.draft});
+
+  final Map<String, dynamic> draft;
+}
+
 class _PsychQuestionnairePage extends StatefulWidget {
-  const _PsychQuestionnairePage({this.initialAnswers});
+  const _PsychQuestionnairePage({
+    this.initialAnswers,
+    this.onPsychSaved,
+  });
 
   final Map<String, dynamic>? initialAnswers;
+  final Future<void> Function(Map<String, dynamic> psych)? onPsychSaved;
 
   @override
   State<_PsychQuestionnairePage> createState() =>
@@ -2822,9 +3115,20 @@ class _PsychQuestionnairePageState extends State<_PsychQuestionnairePage> {
     );
   }
 
-  void _handleSubmit() {
+  Future<void> _handleSubmit() async {
     FocusScope.of(context).unfocus();
     final result = _PsychResult(responses: List<int>.from(_responses));
+    if (widget.onPsychSaved != null) {
+      await widget.onPsychSaved!(
+        Map<String, dynamic>.from(result.toMap()),
+      );
+      if (!mounted) {
+        return;
+      }
+    }
+    if (!mounted) {
+      return;
+    }
     Navigator.of(context).pop(result);
   }
 }
@@ -2859,9 +3163,13 @@ class _PsychNavigationResult {
 }
 
 class _NutritionQuestionnairePage extends StatefulWidget {
-  const _NutritionQuestionnairePage({this.initialAnswers});
+  const _NutritionQuestionnairePage({
+    this.initialAnswers,
+    this.onNutritionSaved,
+  });
 
   final Map<String, dynamic>? initialAnswers;
+  final Future<void> Function(Map<String, dynamic> nutrition)? onNutritionSaved;
 
   @override
   State<_NutritionQuestionnairePage> createState() =>
@@ -2908,43 +3216,52 @@ class _NutritionQuestionnairePageState
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Scaffold(
-      appBar: AppBar(
-        leading: BackButton(onPressed: () => Navigator.of(context).pop()),
-        title: const Text('Health Profile'),
-      ),
-      body: KeyboardDismissible(
-        child: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-            child: Form(
-              key: _formKey,
-              autovalidateMode: AutovalidateMode.onUserInteraction,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    'Nutrition patterns',
-                    style: theme.textTheme.headlineSmall,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    "Tell us about your usual food choices.",
-                    style: theme.textTheme.bodyMedium,
-                  ),
-                  const SizedBox(height: 16),
-                  ...List.generate(_responses.length, (index) {
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: _buildNutritionQuestion(index, theme),
-                    );
-                  }),
-                  const SizedBox(height: 24),
-                  FilledButton(
-                    onPressed: _handleSubmit,
-                    child: const Text('Continue'),
-                  ),
-                ],
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) {
+          return;
+        }
+        await _handleBack();
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          leading: BackButton(onPressed: () => _handleBack()),
+          title: const Text('Health Profile'),
+        ),
+        body: KeyboardDismissible(
+          child: SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              child: Form(
+                key: _formKey,
+                autovalidateMode: AutovalidateMode.onUserInteraction,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      'Nutrition patterns',
+                      style: theme.textTheme.headlineSmall,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      "Tell us about your usual food choices.",
+                      style: theme.textTheme.bodyMedium,
+                    ),
+                    const SizedBox(height: 16),
+                    ...List.generate(_responses.length, (index) {
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: _buildNutritionQuestion(index, theme),
+                      );
+                    }),
+                    const SizedBox(height: 24),
+                    FilledButton(
+                      onPressed: _handleSubmit,
+                      child: const Text('Continue'),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -2977,12 +3294,40 @@ class _NutritionQuestionnairePageState
     );
   }
 
-  void _handleSubmit() {
+  Future<void> _handleSubmit() async {
     FocusScope.of(context).unfocus();
     final result = _NutritionResult(
       nutrition: _NutritionAnswers(responses: List<int>.from(_responses)),
     );
+    final map = result.toMap();
+    if (widget.onNutritionSaved != null) {
+      await widget.onNutritionSaved!(Map<String, dynamic>.from(map));
+      if (!mounted) {
+        return;
+      }
+    }
+    if (!mounted) {
+      return;
+    }
     Navigator.of(context).pop(result);
+  }
+
+  Future<void> _handleBack() async {
+    final draft = _NutritionNavigationResult.back(
+      draft: _NutritionAnswers(responses: List<int>.from(_responses)).toMap(),
+    );
+    if (widget.onNutritionSaved != null) {
+      await widget.onNutritionSaved!(
+        Map<String, dynamic>.from(draft.draft),
+      );
+      if (!mounted) {
+        return;
+      }
+    }
+    if (!mounted) {
+      return;
+    }
+    Navigator.of(context).pop(draft);
   }
 }
 
@@ -2992,12 +3337,21 @@ class _StressSleepQuestionnairePage extends StatefulWidget {
     this.initialSleepAnswers,
     this.initialNutritionAnswers,
     this.initialPsychAnswers,
+    this.onStressSleepSaved,
+    this.onNutritionSaved,
+    this.onPsychSaved,
   });
 
   final Map<String, dynamic>? initialStressAnswers;
   final Map<String, dynamic>? initialSleepAnswers;
   final Map<String, dynamic>? initialNutritionAnswers;
   final Map<String, dynamic>? initialPsychAnswers;
+  final Future<void> Function(
+    Map<String, dynamic> stress,
+    Map<String, dynamic> sleep,
+  )? onStressSleepSaved;
+  final Future<void> Function(Map<String, dynamic> nutrition)? onNutritionSaved;
+  final Future<void> Function(Map<String, dynamic> psych)? onPsychSaved;
 
   @override
   State<_StressSleepQuestionnairePage> createState() =>
@@ -3247,21 +3601,46 @@ class _StressSleepQuestionnairePageState
     FocusScope.of(context).unfocus();
     final stress = _StressAnswers(responses: List<int>.from(_stressResponses));
     final sleep = _SleepAnswers(responses: List<int>.from(_sleepResponses));
+    final stressMap = stress.toMap()
+      ..['loadIndex'] = _computeStressLoad(stress, sleep);
+    final sleepMap = sleep.toMap();
 
-    final firstNutritionResult = await Navigator.of(context)
-        .push<_NutritionResult>(
+    if (widget.onStressSleepSaved != null) {
+      await widget.onStressSleepSaved!(
+        Map<String, dynamic>.from(stressMap),
+        Map<String, dynamic>.from(sleepMap),
+      );
+    }
+
+    final firstNutritionOutcome = await Navigator.of(context)
+        .push<Object?>(
           MaterialPageRoute(
             builder: (_) =>
-                _NutritionQuestionnairePage(initialAnswers: _initialNutrition),
+                _NutritionQuestionnairePage(
+              initialAnswers: _initialNutrition,
+              onNutritionSaved: widget.onNutritionSaved,
+            ),
             fullscreenDialog: true,
           ),
         );
 
-    if (!mounted || firstNutritionResult == null) {
+    if (!mounted) {
       return;
     }
 
-    _initialNutrition = firstNutritionResult.toMap();
+    if (firstNutritionOutcome is _NutritionNavigationResult) {
+      final draft = Map<String, dynamic>.from(firstNutritionOutcome.draft);
+      _initialNutrition = draft;
+      return;
+    }
+
+    if (firstNutritionOutcome is! _NutritionResult) {
+      return;
+    }
+
+    final firstNutritionResult = firstNutritionOutcome;
+    final firstNutritionMap = firstNutritionResult.toMap();
+    _initialNutrition = firstNutritionMap;
 
     var currentNutritionResult = firstNutritionResult;
 
@@ -3271,7 +3650,10 @@ class _StressSleepQuestionnairePageState
       final psychOutcome = await Navigator.of(context).push<Object?>(
         MaterialPageRoute(
           builder: (_) =>
-              _PsychQuestionnairePage(initialAnswers: psychInitialAnswers),
+              _PsychQuestionnairePage(
+            initialAnswers: psychInitialAnswers,
+            onPsychSaved: widget.onPsychSaved,
+          ),
           fullscreenDialog: true,
         ),
       );
@@ -3281,7 +3663,11 @@ class _StressSleepQuestionnairePageState
       }
 
       if (psychOutcome is _PsychResult) {
-        _initialPsych = psychOutcome.toMap();
+        final psychMap = psychOutcome.toMap();
+        _initialPsych = psychMap;
+        if (widget.onPsychSaved != null) {
+          await widget.onPsychSaved!(Map<String, dynamic>.from(psychMap));
+        }
         Navigator.of(context).pop(
           _StressSleepResult(
             stress: stress,
@@ -3298,22 +3684,36 @@ class _StressSleepQuestionnairePageState
         psychInitialAnswers = {'items': List<int>.from(psychOutcome.responses)};
         _initialPsych = psychInitialAnswers;
 
-        final updatedNutrition = await Navigator.of(context)
-            .push<_NutritionResult>(
+        final updatedNutritionOutcome = await Navigator.of(context)
+            .push<Object?>(
               MaterialPageRoute(
                 builder: (_) => _NutritionQuestionnairePage(
                   initialAnswers: _initialNutrition,
+                  onNutritionSaved: widget.onNutritionSaved,
                 ),
                 fullscreenDialog: true,
               ),
             );
 
-        if (!mounted || updatedNutrition == null) {
+        if (!mounted) {
           return;
         }
 
+        if (updatedNutritionOutcome is _NutritionNavigationResult) {
+          final draft =
+              Map<String, dynamic>.from(updatedNutritionOutcome.draft);
+          _initialNutrition = draft;
+          return;
+        }
+
+        if (updatedNutritionOutcome is! _NutritionResult) {
+          return;
+        }
+
+        final updatedNutrition = updatedNutritionOutcome;
         currentNutritionResult = updatedNutrition;
-        _initialNutrition = updatedNutrition.toMap();
+        final updatedNutritionMap = updatedNutrition.toMap();
+        _initialNutrition = updatedNutritionMap;
         continue;
       }
 
