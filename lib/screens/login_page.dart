@@ -185,7 +185,9 @@ class _LoginPageState extends State<LoginPage>
   }
 
   Future<void> _showEmailSheet() async {
+    final navigator = Navigator.of(context);
     if (!await _ensureFirebaseInitialized()) return;
+    if (!mounted) return;
     final success = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
@@ -196,7 +198,7 @@ class _LoginPageState extends State<LoginPage>
     if (success == true) {
       await _guestService.clearGuestProfile();
       if (!mounted) return;
-      Navigator.of(context).pushReplacementNamed('/home');
+      navigator.pushReplacementNamed('/home');
     }
   }
 
