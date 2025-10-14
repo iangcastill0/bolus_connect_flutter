@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import '../services/consent_service.dart';
 
 class WelcomePage extends StatelessWidget {
   const WelcomePage({super.key});
@@ -21,17 +21,27 @@ class WelcomePage extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    Icon(Icons.bloodtype, size: 80, color: theme.colorScheme.primary),
+                    Icon(
+                      Icons.bloodtype,
+                      size: 80,
+                      color: theme.colorScheme.primary,
+                    ),
                     const SizedBox(height: 16),
                     Text(
                       'Welcome to Bolus Connect',
-                      style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+                      style: theme.textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 8),
                     Text(
                       'Manage your insulin boluses and stay connected with your data.',
-                      style: theme.textTheme.bodyMedium?.copyWith(color: theme.textTheme.bodyMedium?.color?.withOpacity(0.8)),
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.textTheme.bodyMedium?.color?.withOpacity(
+                          0.8,
+                        ),
+                      ),
                       textAlign: TextAlign.center,
                     ),
                   ],
@@ -46,10 +56,13 @@ class WelcomePage extends StatelessWidget {
                     height: 48,
                     child: ElevatedButton(
                       onPressed: () async {
-                        final prefs = await SharedPreferences.getInstance();
-                        final accepted = prefs.getBool('disclaimerAccepted') ?? false;
+                        const consentService = ConsentService();
+                        final accepted = await consentService
+                            .hasAcceptedLatestDisclaimer();
                         if (!context.mounted) return;
-                        Navigator.of(context).pushNamed(accepted ? '/login' : '/disclaimer');
+                        Navigator.of(
+                          context,
+                        ).pushNamed(accepted ? '/login' : '/disclaimer');
                       },
                       child: const Text('Get Started'),
                     ),
@@ -60,14 +73,18 @@ class WelcomePage extends StatelessWidget {
                     child: OutlinedButton(
                       onPressed: () async {
                         try {
-                          final uri = Uri.parse('https://main.d22r4spo0im9ey.amplifyapp.com/');
+                          final uri = Uri.parse(
+                            'https://main.d22r4spo0im9ey.amplifyapp.com/',
+                          );
                           final ok = await launchUrl(
                             uri,
                             mode: LaunchMode.externalApplication,
                           );
                           if (!ok && context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Could not open Learn More link')),
+                              const SnackBar(
+                                content: Text('Could not open Learn More link'),
+                              ),
                             );
                           }
                         } catch (e) {

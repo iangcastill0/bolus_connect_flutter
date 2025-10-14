@@ -1,11 +1,12 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'login_page.dart';
 import 'welcome_page.dart';
 import 'main_tabs_page.dart';
 import 'animated_splash_screen.dart';
+import '../services/consent_service.dart';
+import '../services/guest_session_service.dart';
 
 class AuthGate extends StatefulWidget {
   const AuthGate({super.key});
@@ -18,23 +19,41 @@ class _AuthGateState extends State<AuthGate> {
   bool? _disclaimerAccepted;
   bool _showAnimatedSplash = true;
   bool _splashCompleted = false;
+  static const ConsentService _consentService = ConsentService();
+  final GuestSessionService _guestService = GuestSessionService.instance;
+  GuestProfile? _guestProfile;
+  VoidCallback? _guestListener;
 
   @override
   void initState() {
     super.initState();
     debugPrint('🚀 AuthGate: Initializing, will show splash first');
+    _guestListener = () {
+      if (!mounted) return;
+      setState(() => _guestProfile = _guestService.profileListenable.value);
+    };
+    _guestService.profileListenable.addListener(_guestListener!);
     _loadDisclaimer();
+  }
+
+  @override
+  void dispose() {
+    if (_guestListener != null) {
+      _guestService.profileListenable.removeListener(_guestListener!);
+    }
+    super.dispose();
   }
 
   Future<void> _loadDisclaimer() async {
     debugPrint('📋 AuthGate: Loading disclaimer preference');
-    final prefs = await SharedPreferences.getInstance();
-    final accepted = prefs.getBool('disclaimerAccepted') ?? false;
-    debugPrint('📋 AuthGate: Disclaimer accepted = $accepted');
+    final accepted = await _consentService.hasAcceptedLatestDisclaimer();
+    debugPrint('📋 AuthGate: Disclaimer accepted (latest version) = $accepted');
+    final guest = await _guestService.loadProfile();
 
     // Store the value but DON'T trigger setState yet
     // This prevents rebuilds from interrupting the splash screen
     _disclaimerAccepted = accepted;
+    _guestProfile = guest;
   }
 
   void _onSplashComplete() {
@@ -53,9 +72,7 @@ class _AuthGateState extends State<AuthGate> {
   Widget build(BuildContext context) {
     // Show animated splash on cold start (takes priority over everything else)
     if (_showAnimatedSplash && !_splashCompleted) {
-      return AnimatedSplashScreen(
-        onComplete: _onSplashComplete,
-      );
+      return AnimatedSplashScreen(onComplete: _onSplashComplete);
     }
 
     // After splash completes, check if we're still loading data
@@ -64,6 +81,10 @@ class _AuthGateState extends State<AuthGate> {
     }
 
     // After splash and data loading, show appropriate screen based on auth state
+    if (_guestProfile != null && _disclaimerAccepted == true) {
+      return const MainTabsPage();
+    }
+
     return StreamBuilder<User?>(
       stream: FirebaseAuth.instance.authStateChanges(),
       builder: (context, snapshot) {
@@ -101,7 +122,9 @@ class _Splash extends StatelessWidget {
             SizedBox(
               width: 36,
               height: 36,
-              child: CircularProgressIndicator(color: theme.colorScheme.primary),
+              child: CircularProgressIndicator(
+                color: theme.colorScheme.primary,
+              ),
             ),
             const SizedBox(height: 12),
             Text('Loading...', style: theme.textTheme.bodyMedium),
@@ -111,4 +134,3 @@ class _Splash extends StatelessWidget {
     );
   }
 }
-

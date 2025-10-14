@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../services/health_profile_sync_service.dart';
 import '../services/health_questionnaire_service.dart';
 import 'health_questionnaire_dialog.dart';
+import '../services/guest_session_service.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -14,11 +15,28 @@ class SettingsPage extends StatefulWidget {
 
 class SettingsPageState extends State<SettingsPage> {
   Future<Map<String, dynamic>?>? _profileFuture;
+  final GuestSessionService _guestService = GuestSessionService.instance;
+  GuestProfile? _guestProfile;
+  VoidCallback? _guestListener;
 
   @override
   void initState() {
     super.initState();
     _profileFuture = _loadProfile();
+    _guestProfile = _guestService.profileListenable.value;
+    _guestListener = () {
+      if (!mounted) return;
+      setState(() => _guestProfile = _guestService.profileListenable.value);
+    };
+    _guestService.profileListenable.addListener(_guestListener!);
+  }
+
+  @override
+  void dispose() {
+    if (_guestListener != null) {
+      _guestService.profileListenable.removeListener(_guestListener!);
+    }
+    super.dispose();
   }
 
   Future<Map<String, dynamic>?> _loadProfile() async {
@@ -34,7 +52,11 @@ class SettingsPageState extends State<SettingsPage> {
   }
 
   Future<void> _signOut(BuildContext context) async {
-    await FirebaseAuth.instance.signOut();
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      await FirebaseAuth.instance.signOut();
+    }
+    await _guestService.clearGuestProfile();
     if (context.mounted) {
       Navigator.of(context).pushNamedAndRemoveUntil('/login', (r) => false);
     }
@@ -45,8 +67,9 @@ class SettingsPageState extends State<SettingsPage> {
     if (user == null) return;
 
     final messenger = ScaffoldMessenger.of(context);
-    final existing =
-        await HealthQuestionnaireService.loadAnswersForUser(user.uid);
+    final existing = await HealthQuestionnaireService.loadAnswersForUser(
+      user.uid,
+    );
     if (!context.mounted) return;
 
     final result = await showHealthQuestionnaireDialog(
@@ -80,6 +103,7 @@ class SettingsPageState extends State<SettingsPage> {
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
+    final isGuest = user == null && _guestProfile != null;
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
       body: ListView(
@@ -87,20 +111,28 @@ class SettingsPageState extends State<SettingsPage> {
         children: [
           ListTile(
             leading: const Icon(Icons.person_outline),
-            title: Text(user?.email ?? 'Signed in'),
-            subtitle: const Text('Account'),
+            title: Text(
+              user?.email ?? (isGuest ? 'Guest mode' : 'Not signed in'),
+            ),
+            subtitle: Text(
+              isGuest
+                  ? 'Ephemeral local profile — upgrade to sync data.'
+                  : 'Account',
+            ),
           ),
           const Divider(),
           FutureBuilder<Map<String, dynamic>?>(
             future: _profileFuture,
             builder: (context, snapshot) {
-              final subtitle = _profileSubtitle(snapshot.data);
+              final subtitle = isGuest
+                  ? 'Available after signing in with Apple, Google, or Email.'
+                  : _profileSubtitle(snapshot.data);
               return ListTile(
                 leading: const Icon(Icons.favorite_outline),
                 title: const Text('Health profile'),
                 subtitle: Text(subtitle),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => _editHealthProfile(context),
+                trailing: isGuest ? null : const Icon(Icons.chevron_right),
+                onTap: isGuest ? null : () => _editHealthProfile(context),
               );
             },
           ),
@@ -115,7 +147,7 @@ class SettingsPageState extends State<SettingsPage> {
           const Divider(),
           ListTile(
             leading: const Icon(Icons.logout),
-            title: const Text('Sign out'),
+            title: Text(isGuest ? 'Leave guest mode' : 'Sign out'),
             onTap: () => _signOut(context),
           ),
         ],
