@@ -92,16 +92,18 @@ class _MainTabsPageState extends State<MainTabsPage> {
         await HealthQuestionnaireService.isCompletedForUser(user.uid);
     if (!mounted) return;
 
-    final metadata = user.metadata;
-    final creationTime = metadata.creationTime;
-    final lastSignInTime = metadata.lastSignInTime;
-    final isLikelyFirstLogin = creationTime != null &&
-        lastSignInTime != null &&
-        creationTime.isAtSameMomentAs(lastSignInTime);
-    final shouldPrompt = isLikelyFirstLogin || !alreadyCompleted;
-    if (!shouldPrompt) return;
+    // Only prompt if the user hasn't completed the questionnaire yet
+    if (alreadyCompleted) return;
 
-    final result = await showHealthQuestionnaireDialog(context);
+    // Load any previously saved draft answers
+    final initialAnswers = await HealthQuestionnaireService.loadAnswersForUser(user.uid);
+    if (!mounted) return;
+
+    final result = await showHealthQuestionnaireDialog(
+      context,
+      allowCancel: false,
+      initialAnswers: initialAnswers,
+    );
     if (!mounted) return;
     if (result == null) return;
 

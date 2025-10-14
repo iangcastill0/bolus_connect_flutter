@@ -81,20 +81,6 @@ class WelcomePage extends StatelessWidget {
                       child: const Text('Learn More'),
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  Center(
-                    child: TextButton(
-                      onPressed: () async {
-                        final prefs = await SharedPreferences.getInstance();
-                        await prefs.remove('disclaimerAccepted');
-                        if (!context.mounted) return;
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Onboarding reset. Tap Get Started.')),
-                        );
-                      },
-                      child: const Text('Reset Onboarding'),
-                    ),
-                  ),
                 ],
               ),
             ],

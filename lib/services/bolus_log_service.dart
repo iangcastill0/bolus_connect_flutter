@@ -48,7 +48,7 @@ class BolusLogEntry {
   }
 
   factory BolusLogEntry.fromMap(Map<String, dynamic> map) {
-    double? _castDouble(dynamic value) {
+    double? castDouble(dynamic value) {
       if (value == null) return null;
       if (value is num) return value.toDouble();
       if (value is String) return double.tryParse(value);
@@ -57,13 +57,13 @@ class BolusLogEntry {
 
     return BolusLogEntry(
       timestamp: DateTime.tryParse(map['timestamp'] as String? ?? '') ?? DateTime.now(),
-      glucose: _castDouble(map['glucose']),
+      glucose: castDouble(map['glucose']),
       glucoseUnit: map['glucoseUnit'] as String? ?? 'mg/dL',
-      carbs: _castDouble(map['carbs']),
-      carbBolus: _castDouble(map['carbBolus']) ?? 0,
-      correctionBolus: _castDouble(map['correctionBolus']) ?? 0,
-      trendAdjustment: _castDouble(map['trendAdjustment']) ?? 0,
-      totalBolus: _castDouble(map['totalBolus']) ?? 0,
+      carbs: castDouble(map['carbs']),
+      carbBolus: castDouble(map['carbBolus']) ?? 0,
+      correctionBolus: castDouble(map['correctionBolus']) ?? 0,
+      trendAdjustment: castDouble(map['trendAdjustment']) ?? 0,
+      totalBolus: castDouble(map['totalBolus']) ?? 0,
       notes: map['notes'] as String?,
       id: map['id'] as String? ?? (map['timestamp'] as String? ?? '${DateTime.now().microsecondsSinceEpoch}'),
     );

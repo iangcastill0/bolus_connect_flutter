@@ -94,7 +94,7 @@ class _LogsPageState extends State<LogsPage> {
       final totalUnits =
           group.entries.fold<double>(0, (sum, entry) => sum + entry.totalBolus);
       final summary =
-          '${entryCount} log${entryCount == 1 ? '' : 's'} · ${totalUnits.toStringAsFixed(1)} U';
+          '$entryCount log${entryCount == 1 ? '' : 's'} · ${totalUnits.toStringAsFixed(1)} U';
 
       return Card(
         margin: const EdgeInsets.symmetric(vertical: 8),

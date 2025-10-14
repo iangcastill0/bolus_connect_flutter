@@ -80,6 +80,93 @@ class _LabeledOption {
   final String label;
 }
 
+class _QuestionnaireProgressIndicator extends StatelessWidget
+    implements PreferredSizeWidget {
+  const _QuestionnaireProgressIndicator({
+    required this.currentStep,
+    required this.totalSteps,
+  });
+
+  final int currentStep;
+  final int totalSteps;
+
+  @override
+  Size get preferredSize => const Size.fromHeight(6.0);
+
+  @override
+  Widget build(BuildContext context) {
+    final progress = currentStep / totalSteps;
+    final theme = Theme.of(context);
+
+    return Container(
+      height: 6.0,
+      decoration: BoxDecoration(
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            offset: const Offset(0, 1),
+            blurRadius: 2,
+          ),
+        ],
+      ),
+      child: Stack(
+        children: [
+          // Background with inner shadow effect
+          Container(
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surfaceContainerHighest,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.08),
+                  offset: const Offset(0, 1),
+                  blurRadius: 1,
+                  spreadRadius: 0,
+                ),
+              ],
+            ),
+          ),
+          // Progress bar with gradient and highlight
+          FractionallySizedBox(
+            widthFactor: progress,
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    theme.colorScheme.primary.withOpacity(0.9),
+                    theme.colorScheme.primary,
+                  ],
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: theme.colorScheme.primary.withOpacity(0.4),
+                    offset: const Offset(0, 1),
+                    blurRadius: 3,
+                  ),
+                ],
+              ),
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.white.withOpacity(0.3),
+                      Colors.transparent,
+                    ],
+                    stops: const [0.0, 0.5],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _RegionOption {
   const _RegionOption({
     required this.code,
@@ -286,6 +373,7 @@ class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
   final Set<String> _medications = <String>{};
   double? _bmi;
   bool _showSelectionErrors = false;
+  int _currentProfileSection = 0; // 0, 1, or 2 for the three sections
   Map<String, dynamic> _draftAnswers = <String, dynamic>{};
   Map<String, dynamic>? _initialLifestyle;
   Map<String, dynamic>? _initialActivity;
@@ -383,6 +471,8 @@ class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
   ) {
     if (node.hasFocus) return;
     _validateFormField(fieldId, key);
+    // Auto-save draft when field loses focus
+    _persistProfileDraft();
   }
 
   void _invalidateField(_FieldId fieldId) {
@@ -601,34 +691,109 @@ class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isSaving = _sectionSaving.values.any((saving) => saving);
-    final leading = widget.allowCancel
-        ? BackButton(
-            onPressed: () {
-              final navigator = Navigator.of(context);
-              if (navigator.canPop()) {
-                navigator.pop();
-              }
-            },
-          )
-        : null;
+
+    // Determine the leading button based on current section
+    Widget? leading;
+    if (_currentProfileSection == 1) {
+      // Section 2: Show back button to go to section 1
+      leading = BackButton(onPressed: _goBackToSection1);
+    } else if (_currentProfileSection == 2) {
+      // Section 3: Show back button to go to section 2
+      leading = BackButton(onPressed: _goBackToSection2);
+    } else if (widget.allowCancel) {
+      // Section 1: Only show back button if allowCancel is true
+      leading = BackButton(
+        onPressed: () {
+          final navigator = Navigator.of(context);
+          if (navigator.canPop()) {
+            navigator.pop();
+          }
+        },
+      );
+    }
 
     final scaffold = Scaffold(
-      appBar: AppBar(title: const Text('Health Profile'), leading: leading),
-      body: KeyboardDismissible(
-        child: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      appBar: AppBar(
+        title: const Text('Health Profile'),
+        leading: leading,
+        bottom: const _QuestionnaireProgressIndicator(
+          currentStep: 1,
+          totalSteps: 6,
+        ),
+      ),
+      body: MediaQuery(
+        data: MediaQuery.of(context).copyWith(
+          textScaler: const TextScaler.linear(1.25),
+        ),
+        child: KeyboardDismissible(
+          child: SafeArea(
+            child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
             child: Form(
               key: _formKey,
-              autovalidateMode: AutovalidateMode.onUserInteraction,
+              autovalidateMode: AutovalidateMode.disabled,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Text(
                     "Let's start with your health profile",
-                    style: theme.textTheme.headlineSmall,
+                    style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w600),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 20),
+                  ..._buildCurrentSection(theme),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+      ),
+    );
+    if (widget.allowCancel) {
+      return scaffold;
+    }
+
+    // Handle back navigation between sections, but prevent exit from section 1
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, __) {
+        if (didPop) return;
+
+        // If in section 2 or 3, go back to previous section
+        if (_currentProfileSection == 2) {
+          _goBackToSection2();
+        } else if (_currentProfileSection == 1) {
+          _goBackToSection1();
+        } else if (_currentProfileSection == 0) {
+          // In section 1, show error message and prevent exit
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Please complete the health profile'),
+              duration: const Duration(milliseconds: 1500),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      },
+      child: scaffold,
+    );
+  }
+
+  List<Widget> _buildCurrentSection(ThemeData theme) {
+    switch (_currentProfileSection) {
+      case 0:
+        return _buildSection1(theme);
+      case 1:
+        return _buildSection2(theme);
+      case 2:
+        return _buildSection3(theme);
+      default:
+        return [];
+    }
+  }
+
+  List<Widget> _buildSection1(ThemeData theme) {
+    return [
                   _buildValidatedField(
                     context: context,
                     fieldId: _FieldId.fullName,
@@ -655,7 +820,7 @@ class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
                       },
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 20),
                   _buildValidatedField(
                     context: context,
                     fieldId: _FieldId.dob,
@@ -685,7 +850,7 @@ class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
                     const SizedBox(height: 8),
                     Text('Age: ${_calculateAge(_dob!)} years'),
                   ],
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 20),
                   _buildValidatedField(
                     context: context,
                     fieldId: _FieldId.gender,
@@ -706,6 +871,7 @@ class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
                       onChanged: (value) {
                         setState(() => _gender = value);
                         _genderFieldKey.currentState?.didChange(value);
+                        _persistProfileDraft(); // Auto-save on selection change
                         if (value == null) {
                           _updateFieldValidity(_FieldId.gender, false);
                         } else {
@@ -720,7 +886,7 @@ class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
                           : null,
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 20),
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
@@ -783,7 +949,7 @@ class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 20),
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
@@ -850,7 +1016,16 @@ class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
                     const SizedBox(height: 8),
                     Text('BMI: ${_bmi!.toStringAsFixed(1)}'),
                   ],
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 32),
+                  FilledButton(
+                    onPressed: _goToSection2,
+                    child: const Text('Next'),
+                  ),
+    ];
+  }
+
+  List<Widget> _buildSection2(ThemeData theme) {
+    return [
                   _buildValidatedField(
                     context: context,
                     fieldId: _FieldId.country,
@@ -874,7 +1049,7 @@ class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
                           : null,
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 20),
                   _buildValidatedField(
                     context: context,
                     fieldId: _FieldId.diabetesType,
@@ -895,6 +1070,7 @@ class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
                       onChanged: (value) {
                         setState(() => _diabetesType = value);
                         _diabetesTypeFieldKey.currentState?.didChange(value);
+                        _persistProfileDraft(); // Auto-save on selection change
                         if (value == null) {
                           _updateFieldValidity(_FieldId.diabetesType, false);
                         } else {
@@ -908,7 +1084,7 @@ class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
                           value == null ? 'Select your diabetes type' : null,
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 20),
                   _buildValidatedField(
                     context: context,
                     fieldId: _FieldId.treatment,
@@ -929,6 +1105,7 @@ class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
                       onChanged: (value) {
                         setState(() => _treatment = value);
                         _treatmentFieldKey.currentState?.didChange(value);
+                        _persistProfileDraft(); // Auto-save on selection change
                         if (value == null) {
                           _updateFieldValidity(_FieldId.treatment, false);
                         } else {
@@ -943,7 +1120,16 @@ class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
                           : null,
                     ),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 32),
+                  FilledButton(
+                    onPressed: _goToSection3,
+                    child: const Text('Next'),
+                  ),
+    ];
+  }
+
+  List<Widget> _buildSection3(ThemeData theme) {
+    return [
                   Text('Known conditions', style: theme.textTheme.titleMedium),
                   const SizedBox(height: 8),
                   Wrap(
@@ -1002,31 +1188,10 @@ class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
                     ),
                   const SizedBox(height: 32),
                   FilledButton(
-                    onPressed: isSaving ? null : _handleContinue,
-                    child: isSaving
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Text('Continue'),
+                    onPressed: _handleContinueToLifestyle,
+                    child: const Text("(Next) typical day"),
                   ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-    if (widget.allowCancel) {
-      return scaffold;
-    }
-
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (_, __) {},
-      child: scaffold,
-    );
+    ];
   }
 
   void _applyInitialAnswers() {
@@ -1179,7 +1344,90 @@ class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
         _dobController.text = _formatDate(picked);
       });
       _validateFormField(_FieldId.dob, _dobFieldKey);
+      _persistProfileDraft(); // Auto-save on date selection
     }
+  }
+
+  Future<void> _goToSection2() async {
+    // Validate section 1 fields before proceeding
+    FocusScope.of(context).unfocus();
+    final formValid = _formKey.currentState?.validate() ?? false;
+
+    if (!formValid) {
+      return;
+    }
+    if (_dob == null || _gender == null) {
+      return;
+    }
+
+    // Save draft before moving to next section
+    await _persistProfileDraft();
+
+    if (!mounted) return;
+
+    setState(() {
+      _currentProfileSection = 1;
+    });
+  }
+
+  Future<void> _goToSection3() async {
+    // Validate section 2 fields before proceeding
+    FocusScope.of(context).unfocus();
+    final formValid = _formKey.currentState?.validate() ?? false;
+
+    if (!formValid) {
+      return;
+    }
+    if (_countryCode == null || _diabetesType == null || _treatment == null) {
+      return;
+    }
+
+    // Save draft before moving to next section
+    await _persistProfileDraft();
+
+    if (!mounted) return;
+
+    setState(() {
+      _currentProfileSection = 2;
+    });
+  }
+
+  Future<void> _goBackToSection1() async {
+    // Save draft before going back
+    await _persistProfileDraft();
+
+    if (!mounted) return;
+
+    setState(() {
+      _currentProfileSection = 0;
+    });
+  }
+
+  Future<void> _goBackToSection2() async {
+    // Save draft before going back
+    await _persistProfileDraft();
+
+    if (!mounted) return;
+
+    setState(() {
+      _currentProfileSection = 1;
+    });
+  }
+
+  Future<void> _handleContinueToLifestyle() async {
+    // Validate section 3 before proceeding to next questionnaire
+    FocusScope.of(context).unfocus();
+    final selectionsValid = _conditions.isNotEmpty && _medications.isNotEmpty;
+
+    if (!selectionsValid) {
+      setState(() => _showSelectionErrors = true);
+      return;
+    }
+
+    setState(() => _showSelectionErrors = false);
+
+    // Now call the original _handleContinue logic
+    await _handleContinue();
   }
 
   Future<void> _handleContinue() async {
@@ -1317,6 +1565,74 @@ class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
         metrics['psych'] = {'index': psych['index']};
       }
       updated['metrics'] = metrics;
+    }
+
+    updated['updatedAt'] = DateTime.now().toIso8601String();
+    _draftAnswers = updated;
+
+    await HealthQuestionnaireService.saveAnswersForUser(
+      user.uid,
+      Map<String, dynamic>.from(updated),
+    );
+  }
+
+  Future<void> _persistProfileDraft() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      return;
+    }
+
+    final heightValue = _parsePositiveNumber(_heightController.text);
+    final weightValue = _parsePositiveNumber(_weightController.text);
+    final heightCm = heightValue != null && _heightUnit == 'cm'
+        ? heightValue
+        : heightValue != null
+            ? heightValue * 2.54
+            : null;
+    final weightKg = weightValue != null && _weightUnit == 'kg'
+        ? weightValue
+        : weightValue != null
+            ? weightValue * 0.45359237
+            : null;
+
+    final updated = Map<String, dynamic>.from(_draftAnswers);
+
+    // Save all profile fields that have been filled in
+    if (_nameController.text.trim().isNotEmpty) {
+      updated['fullName'] = _nameController.text.trim();
+    }
+    if (_dob != null) {
+      updated['dateOfBirth'] = _dob!.toIso8601String();
+    }
+    if (_gender != null) {
+      updated['gender'] = _gender;
+    }
+    if (heightCm != null) {
+      updated['heightCm'] = heightCm;
+    }
+    if (weightKg != null) {
+      updated['weightKg'] = weightKg;
+    }
+    if (_countryCode != null) {
+      updated['countryCode'] = _countryCode;
+    }
+    if (_glucoseUnit.isNotEmpty) {
+      updated['glucoseUnit'] = _glucoseUnit;
+    }
+    if (_diabetesType != null) {
+      updated['diabetesType'] = _diabetesType;
+    }
+    if (_treatment != null) {
+      updated['treatment'] = _treatment;
+    }
+    if (_conditions.isNotEmpty) {
+      updated['conditions'] = _conditions.toList();
+    }
+    if (_medications.isNotEmpty) {
+      updated['medications'] = _medications.toList();
+    }
+    if (_bmi != null) {
+      updated['bmi'] = _bmi;
     }
 
     updated['updatedAt'] = DateTime.now().toIso8601String();
@@ -1543,6 +1859,7 @@ class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
     });
     _countryFieldKey.currentState?.didChange(code);
     _validateDropdownField(_FieldId.country, _countryFieldKey);
+    _persistProfileDraft(); // Auto-save on country selection
   }
 
   void _toggleCondition(String value, bool selected) {
@@ -1566,6 +1883,7 @@ class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
     });
     _updateFieldValidity(_FieldId.conditions, _conditions.isNotEmpty);
     unawaited(_maybeSaveSectionForField(_FieldId.conditions));
+    _persistProfileDraft(); // Auto-save on condition toggle
   }
 
   void _toggleMedication(String value, bool selected) {
@@ -1589,6 +1907,7 @@ class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
     });
     _updateFieldValidity(_FieldId.medications, _medications.isNotEmpty);
     unawaited(_maybeSaveSectionForField(_FieldId.medications));
+    _persistProfileDraft(); // Auto-save on medication toggle
   }
 
   void _updateDerivedMetrics() {
@@ -1809,6 +2128,7 @@ class _LifestyleQuestionnairePageState
   String? _alcoholConsumption;
   String? _smokingStatus;
   String? _energyLevel;
+  int _currentLifestyleSection = 0; // 0, 1, or 2 for the three sections
   Map<String, dynamic>? _initialActivity;
   Map<String, dynamic>? _initialStress;
   Map<String, dynamic>? _initialSleep;
@@ -1884,14 +2204,22 @@ class _LifestyleQuestionnairePageState
           },
         ),
         title: const Text('Health Profile'),
+        bottom: const _QuestionnaireProgressIndicator(
+          currentStep: 2,
+          totalSteps: 6,
+        ),
       ),
-      body: KeyboardDismissible(
-        child: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      body: MediaQuery(
+        data: MediaQuery.of(context).copyWith(
+          textScaler: const TextScaler.linear(1.25),
+        ),
+        child: KeyboardDismissible(
+          child: SafeArea(
+            child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
             child: Form(
               key: _formKey,
-              autovalidateMode: AutovalidateMode.onUserInteraction,
+              autovalidateMode: AutovalidateMode.disabled,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -1901,7 +2229,33 @@ class _LifestyleQuestionnairePageState
                     "Let's talk about your typical day.",
                     style: theme.textTheme.bodyMedium,
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 20),
+                  ..._buildCurrentLifestyleSection(theme),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+      ),
+    );
+  }
+
+  List<Widget> _buildCurrentLifestyleSection(ThemeData theme) {
+    switch (_currentLifestyleSection) {
+      case 0:
+        return _buildLifestyleSection1(theme);
+      case 1:
+        return _buildLifestyleSection2(theme);
+      case 2:
+        return _buildLifestyleSection3(theme);
+      default:
+        return [];
+    }
+  }
+
+  List<Widget> _buildLifestyleSection1(ThemeData theme) {
+    return [
                   _buildTimeField(
                     context: context,
                     label: 'Wake-up time',
@@ -1955,7 +2309,16 @@ class _LifestyleQuestionnairePageState
                     onChanged: (value) =>
                         setState(() => _sleepQuality = value ?? 3),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 32),
+                  FilledButton(
+                    onPressed: _goToLifestyleSection2,
+                    child: const Text('Next'),
+                  ),
+    ];
+  }
+
+  List<Widget> _buildLifestyleSection2(ThemeData theme) {
+    return [
                   DropdownButtonFormField<String>(
                     key: ValueKey('workPattern-${_workPattern ?? 'unset'}'),
                     initialValue: _workPattern,
@@ -2019,7 +2382,16 @@ class _LifestyleQuestionnairePageState
                     value: _dinnerTime,
                     onPick: (picked) => setState(() => _dinnerTime = picked),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 32),
+                  FilledButton(
+                    onPressed: _goToLifestyleSection3,
+                    child: const Text('Next'),
+                  ),
+    ];
+  }
+
+  List<Widget> _buildLifestyleSection3(ThemeData theme) {
+    return [
                   DropdownButtonFormField<String>(
                     key: ValueKey('caffeine-${_caffeineIntake ?? 'unset'}'),
                     initialValue: _caffeineIntake,
@@ -2098,18 +2470,12 @@ class _LifestyleQuestionnairePageState
                     validator: (value) =>
                         value == null ? 'Select energy level' : null,
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 32),
                   FilledButton(
                     onPressed: _handleSubmit,
-                    child: const Text('Continue'),
+                    child: const Text('(Next) Physical Health'),
                   ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
+    ];
   }
 
   FormField<TimeOfDay> _buildTimeField({
@@ -2165,6 +2531,40 @@ class _LifestyleQuestionnairePageState
         );
       },
     );
+  }
+
+  void _goToLifestyleSection2() {
+    // Validate section 1 fields before proceeding
+    FocusScope.of(context).unfocus();
+    final formValid = _formKey.currentState?.validate() ?? false;
+
+    if (!formValid) {
+      return;
+    }
+    if (_wakeUpTime == null || _bedtime == null) {
+      return;
+    }
+
+    setState(() {
+      _currentLifestyleSection = 1;
+    });
+  }
+
+  void _goToLifestyleSection3() {
+    // Validate section 2 fields before proceeding
+    FocusScope.of(context).unfocus();
+    final formValid = _formKey.currentState?.validate() ?? false;
+
+    if (!formValid) {
+      return;
+    }
+    if (_workPattern == null || _breakfastHabit == null || _mealsPerDay == null || _dinnerTime == null) {
+      return;
+    }
+
+    setState(() {
+      _currentLifestyleSection = 2;
+    });
   }
 
   Future<void> _handleSubmit() async {
@@ -2469,6 +2869,7 @@ class _ActivityQuestionnairePageState
   int? _vigorousDays;
   int? _moderateDays;
   int? _walkingDays;
+  int _currentActivitySection = 0; // 0 or 1 for the two sections
   Map<String, dynamic>? _initialStress;
   Map<String, dynamic>? _initialSleep;
   Map<String, dynamic>? _initialNutrition;
@@ -2555,14 +2956,18 @@ class _ActivityQuestionnairePageState
         appBar: AppBar(
           leading: BackButton(onPressed: _handleBackToLifestyle),
           title: const Text('Health Profile'),
+          bottom: const _QuestionnaireProgressIndicator(
+            currentStep: 3,
+            totalSteps: 6,
+          ),
         ),
         body: KeyboardDismissible(
           child: SafeArea(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
               child: Form(
                 key: _formKey,
-                autovalidateMode: AutovalidateMode.onUserInteraction,
+                autovalidateMode: AutovalidateMode.disabled,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -2575,7 +2980,31 @@ class _ActivityQuestionnairePageState
                       "Let's capture your weekly activity.",
                       style: theme.textTheme.bodyMedium,
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 20),
+                    ..._buildCurrentActivitySection(theme),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _buildCurrentActivitySection(ThemeData theme) {
+    switch (_currentActivitySection) {
+      case 0:
+        return _buildActivitySection1(theme);
+      case 1:
+        return _buildActivitySection2(theme);
+      default:
+        return [];
+    }
+  }
+
+  List<Widget> _buildActivitySection1(ThemeData theme) {
+    return [
                     _buildDaysDropdown(
                       label: 'Days per week with vigorous activity',
                       value: _vigorousDays,
@@ -2601,7 +3030,16 @@ class _ActivityQuestionnairePageState
                       label: 'Average minutes per day of moderate activity',
                       requirePositive: (_moderateDays ?? 0) > 0,
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 32),
+                    FilledButton(
+                      onPressed: _goToActivitySection2,
+                      child: const Text('Next'),
+                    ),
+    ];
+  }
+
+  List<Widget> _buildActivitySection2(ThemeData theme) {
+    return [
                     _buildDaysDropdown(
                       label: 'Days per week walking ≥10 minutes continuously',
                       value: _walkingDays,
@@ -2635,19 +3073,12 @@ class _ActivityQuestionnairePageState
                         return null;
                       },
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 32),
                     FilledButton(
                       onPressed: _handleSubmit,
-                      child: const Text('Continue'),
+                      child: const Text('(Next) Stress & Sleep'),
                     ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
+    ];
   }
 
   Map<String, dynamic> _currentActivityMap() {
@@ -2716,7 +3147,7 @@ class _ActivityQuestionnairePageState
       validator: (value) {
         final parsed = _parseNonNegative(value);
         if (requirePositive) {
-          if (parsed == null || parsed <= 0) {
+          if (parsed == null || parsed < 0) {
             return 'Enter minutes for this activity';
           }
         } else if (parsed != null && parsed < 0) {
@@ -2733,6 +3164,23 @@ class _ActivityQuestionnairePageState
     final parsed = double.tryParse(cleaned);
     if (parsed == null || parsed < 0) return null;
     return parsed;
+  }
+
+  void _goToActivitySection2() {
+    // Validate section 1 fields before proceeding
+    FocusScope.of(context).unfocus();
+    final formValid = _formKey.currentState?.validate() ?? false;
+
+    if (!formValid) {
+      return;
+    }
+    if (_vigorousDays == null || _moderateDays == null) {
+      return;
+    }
+
+    setState(() {
+      _currentActivitySection = 1;
+    });
   }
 
   Future<void> _handleSubmit() async {
@@ -3041,14 +3489,18 @@ class _PsychQuestionnairePageState extends State<_PsychQuestionnairePage> {
         appBar: AppBar(
           leading: BackButton(onPressed: _handleBackToNutrition),
           title: const Text('Health Profile'),
+          bottom: const _QuestionnaireProgressIndicator(
+            currentStep: 4,
+            totalSteps: 6,
+          ),
         ),
         body: KeyboardDismissible(
           child: SafeArea(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
               child: Form(
                 key: _formKey,
-                autovalidateMode: AutovalidateMode.onUserInteraction,
+                autovalidateMode: AutovalidateMode.disabled,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -3061,7 +3513,7 @@ class _PsychQuestionnairePageState extends State<_PsychQuestionnairePage> {
                       'How have you felt about diabetes recently?',
                       style: theme.textTheme.bodyMedium,
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 20),
                     ...List.generate(_responses.length, (index) {
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 12),
@@ -3180,6 +3632,7 @@ class _NutritionQuestionnairePageState
     extends State<_NutritionQuestionnairePage> {
   final _formKey = GlobalKey<FormState>();
   final List<int> _responses = List<int>.filled(7, 2);
+  int _currentNutritionSection = 0; // 0 or 1 for the two sections
 
   static const _nutritionPrompts = [
     'Daily fruit and vegetable servings',
@@ -3222,20 +3675,30 @@ class _NutritionQuestionnairePageState
         if (didPop) {
           return;
         }
-        await _handleBack();
+        if (_currentNutritionSection == 1) {
+          _goBackToNutritionSection1();
+        } else {
+          await _handleBack();
+        }
       },
       child: Scaffold(
         appBar: AppBar(
-          leading: BackButton(onPressed: () => _handleBack()),
+          leading: _currentNutritionSection == 1
+              ? BackButton(onPressed: _goBackToNutritionSection1)
+              : BackButton(onPressed: () => _handleBack()),
           title: const Text('Health Profile'),
+          bottom: const _QuestionnaireProgressIndicator(
+            currentStep: 5,
+            totalSteps: 6,
+          ),
         ),
         body: KeyboardDismissible(
           child: SafeArea(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
               child: Form(
                 key: _formKey,
-                autovalidateMode: AutovalidateMode.onUserInteraction,
+                autovalidateMode: AutovalidateMode.disabled,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -3248,18 +3711,8 @@ class _NutritionQuestionnairePageState
                       "Tell us about your usual food choices.",
                       style: theme.textTheme.bodyMedium,
                     ),
-                    const SizedBox(height: 16),
-                    ...List.generate(_responses.length, (index) {
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: _buildNutritionQuestion(index, theme),
-                      );
-                    }),
-                    const SizedBox(height: 24),
-                    FilledButton(
-                      onPressed: _handleSubmit,
-                      child: const Text('Continue'),
-                    ),
+                    const SizedBox(height: 20),
+                    ..._buildCurrentNutritionSection(theme),
                   ],
                 ),
               ),
@@ -3292,6 +3745,65 @@ class _NutritionQuestionnairePageState
         ),
       ],
     );
+  }
+
+  List<Widget> _buildCurrentNutritionSection(ThemeData theme) {
+    switch (_currentNutritionSection) {
+      case 0:
+        return _buildNutritionSection1(theme);
+      case 1:
+        return _buildNutritionSection2(theme);
+      default:
+        return [];
+    }
+  }
+
+  List<Widget> _buildNutritionSection1(ThemeData theme) {
+    return [
+      // Questions 1-4
+      ...List.generate(4, (index) {
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: _buildNutritionQuestion(index, theme),
+        );
+      }),
+      const SizedBox(height: 24),
+      FilledButton(
+        onPressed: _goToNutritionSection2,
+        child: const Text('Next'),
+      ),
+    ];
+  }
+
+  List<Widget> _buildNutritionSection2(ThemeData theme) {
+    return [
+      // Questions 5-7
+      ...List.generate(3, (index) {
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: _buildNutritionQuestion(index + 4, theme),
+        );
+      }),
+      const SizedBox(height: 24),
+      FilledButton(
+        onPressed: _handleSubmit,
+        child: const Text('(Next) Emotional health'),
+      ),
+    ];
+  }
+
+  void _goToNutritionSection2() {
+    // No validation needed (choice chips)
+    // Just move to section 2
+    setState(() {
+      _currentNutritionSection = 1;
+    });
+  }
+
+  void _goBackToNutritionSection1() {
+    setState(() {
+      _currentNutritionSection = 0;
+    });
   }
 
   Future<void> _handleSubmit() async {
@@ -3364,6 +3876,7 @@ class _StressSleepQuestionnairePageState
 
   final List<int> _stressResponses = List<int>.filled(4, 0);
   final List<int> _sleepResponses = List<int>.filled(7, 0);
+  int _currentStressSleepSection = 0; // 0 or 1 for the two sections
   Map<String, dynamic>? _initialNutrition;
   Map<String, dynamic>? _initialPsych;
 
@@ -3450,14 +3963,18 @@ class _StressSleepQuestionnairePageState
         appBar: AppBar(
           leading: BackButton(onPressed: _handleBackToActivity),
           title: const Text('Health Profile'),
+          bottom: const _QuestionnaireProgressIndicator(
+            currentStep: 6,
+            totalSteps: 6,
+          ),
         ),
         body: KeyboardDismissible(
           child: SafeArea(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
               child: Form(
                 key: _formKey,
-                autovalidateMode: AutovalidateMode.onUserInteraction,
+                autovalidateMode: AutovalidateMode.disabled,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -3470,7 +3987,31 @@ class _StressSleepQuestionnairePageState
                       'Share how stress and sleep feel over the past few weeks.',
                       style: theme.textTheme.bodyMedium,
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 20),
+                    ..._buildCurrentStressSleepSection(theme),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _buildCurrentStressSleepSection(ThemeData theme) {
+    switch (_currentStressSleepSection) {
+      case 0:
+        return _buildStressSleepSection1(theme);
+      case 1:
+        return _buildStressSleepSection2(theme);
+      default:
+        return [];
+    }
+  }
+
+  List<Widget> _buildStressSleepSection1(ThemeData theme) {
+    return [
                     Text(
                       'Perceived Stress (last month)',
                       style: theme.textTheme.titleMedium,
@@ -3482,7 +4023,17 @@ class _StressSleepQuestionnairePageState
                         child: _buildStressQuestion(index),
                       );
                     }),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 32),
+                    FilledButton(
+                      onPressed: _goToStressSleepSection2,
+                      child: const Text('Next'),
+                    ),
+    ];
+  }
+
+  List<Widget> _buildStressSleepSection2(ThemeData theme) {
+    return [
+                    const SizedBox(height: 20),
                     Text(
                       'Sleep quality (past 2 weeks)',
                       style: theme.textTheme.titleMedium,
@@ -3494,19 +4045,20 @@ class _StressSleepQuestionnairePageState
                         child: _buildSleepQuestion(index),
                       );
                     }),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 32),
                     FilledButton(
                       onPressed: _handleSubmit,
-                      child: const Text('Continue'),
+                      child: const Text('(Next) Nutritional Health'),
                     ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
+    ];
+  }
+
+  void _goToStressSleepSection2() {
+    // No validation needed for section 1 (stress questions)
+    // Just move to section 2
+    setState(() {
+      _currentStressSleepSection = 1;
+    });
   }
 
   void _handleBackToActivity() {

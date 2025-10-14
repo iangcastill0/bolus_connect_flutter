@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'login_page.dart';
 import 'welcome_page.dart';
 import 'main_tabs_page.dart';
+import 'animated_splash_screen.dart';
 
 class AuthGate extends StatefulWidget {
   const AuthGate({super.key});
@@ -15,25 +16,54 @@ class AuthGate extends StatefulWidget {
 
 class _AuthGateState extends State<AuthGate> {
   bool? _disclaimerAccepted;
+  bool _showAnimatedSplash = true;
+  bool _splashCompleted = false;
 
   @override
   void initState() {
     super.initState();
+    debugPrint('🚀 AuthGate: Initializing, will show splash first');
     _loadDisclaimer();
   }
 
   Future<void> _loadDisclaimer() async {
+    debugPrint('📋 AuthGate: Loading disclaimer preference');
     final prefs = await SharedPreferences.getInstance();
-    setState(() => _disclaimerAccepted = prefs.getBool('disclaimerAccepted') ?? false);
+    final accepted = prefs.getBool('disclaimerAccepted') ?? false;
+    debugPrint('📋 AuthGate: Disclaimer accepted = $accepted');
+
+    // Store the value but DON'T trigger setState yet
+    // This prevents rebuilds from interrupting the splash screen
+    _disclaimerAccepted = accepted;
+  }
+
+  void _onSplashComplete() {
+    debugPrint('🎯 AuthGate: Splash complete, transitioning to auth flow');
+    if (mounted) {
+      setState(() {
+        _splashCompleted = true;
+        _showAnimatedSplash = false;
+        // Now it's safe to trigger UI updates since splash is done
+        // Force rebuild to show the appropriate screen based on loaded data
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    // Wait for onboarding flag to load
+    // Show animated splash on cold start (takes priority over everything else)
+    if (_showAnimatedSplash && !_splashCompleted) {
+      return AnimatedSplashScreen(
+        onComplete: _onSplashComplete,
+      );
+    }
+
+    // After splash completes, check if we're still loading data
     if (_disclaimerAccepted == null) {
       return const _Splash();
     }
 
+    // After splash and data loading, show appropriate screen based on auth state
     return StreamBuilder<User?>(
       stream: FirebaseAuth.instance.authStateChanges(),
       builder: (context, snapshot) {

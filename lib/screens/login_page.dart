@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -19,6 +20,10 @@ class _LoginPageState extends State<LoginPage> {
   bool _obscure = true;
   bool _loading = false;
   String? _initError; // Firebase initialization error, if any
+
+  // Hidden debug feature: tap counter for resetting onboarding
+  int _tapCount = 0;
+  DateTime? _lastTapTime;
 
   @override
   void initState() {
@@ -123,11 +128,87 @@ class _LoginPageState extends State<LoginPage> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
 
+  /// Hidden debug feature: tap the title 7 times to reset onboarding
+  Future<void> _handleTitleTap() async {
+    final now = DateTime.now();
+
+    // Reset counter if more than 2 seconds since last tap
+    if (_lastTapTime != null && now.difference(_lastTapTime!).inSeconds > 2) {
+      _tapCount = 0;
+    }
+
+    _lastTapTime = now;
+    _tapCount++;
+
+    debugPrint('🔧 Debug tap count: $_tapCount/7');
+
+    if (_tapCount >= 7) {
+      debugPrint('🔄 Resetting onboarding...');
+
+      // Show confirmation
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Reset Onboarding'),
+          content: const Text(
+            'This will reset the disclaimer and onboarding flow. You will be taken back to the welcome screen.\n\nContinue?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Reset'),
+            ),
+          ],
+        ),
+      );
+
+      if (confirmed == true && mounted) {
+        // Reset onboarding state
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool('disclaimerAccepted', false);
+
+        debugPrint('✅ Onboarding reset complete');
+
+        if (!mounted) return;
+
+        // Show success message
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Onboarding reset! Returning to welcome screen...'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+
+        // Navigate to root (which will show WelcomePage)
+        await Future.delayed(const Duration(milliseconds: 500));
+        if (!mounted) return;
+
+        Navigator.of(context).pushNamedAndRemoveUntil(
+          '/',
+          (route) => false,
+        );
+      }
+
+      // Reset tap counter after attempting reset
+      _tapCount = 0;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Scaffold(
-      appBar: AppBar(title: Text(_isLogin ? 'Login' : 'Create Account')),
+      appBar: AppBar(
+        title: GestureDetector(
+          onTap: _handleTitleTap,
+          behavior: HitTestBehavior.opaque,
+          child: Text(_isLogin ? 'Login' : 'Create Account'),
+        ),
+      ),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(

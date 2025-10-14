@@ -153,7 +153,7 @@ class _BolusParametersPageState extends State<BolusParametersPage> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   DropdownButtonFormField<String>(
-                    value: _selectedCgm,
+                    initialValue: _selectedCgm,
                     items: _cgmOptions
                         .map((option) => DropdownMenuItem<String>(
                               value: option == 'None' ? '' : option,
@@ -168,7 +168,7 @@ class _BolusParametersPageState extends State<BolusParametersPage> {
                   ),
                   const SizedBox(height: 16),
                   DropdownButtonFormField<String>(
-                    value: _glucoseUnit,
+                    initialValue: _glucoseUnit,
                     items: const [
                       DropdownMenuItem(value: 'mg/dL', child: Text('mg/dL')),
                       DropdownMenuItem(value: 'mmol/L', child: Text('mmol/L')),
@@ -204,7 +204,7 @@ class _BolusParametersPageState extends State<BolusParametersPage> {
                         ? [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))]
                         : [FilteringTextInputFormatter.digitsOnly],
                     decoration: InputDecoration(
-                      labelText: 'Target glucose (${_glucoseUnit})',
+                      labelText: 'Target glucose ($_glucoseUnit)',
                       hintText:
                           _glucoseUnit == 'mmol/L' ? 'e.g. 6.1' : 'e.g. 110',
                       prefixIcon: const Icon(Icons.bloodtype_outlined),
@@ -220,7 +220,7 @@ class _BolusParametersPageState extends State<BolusParametersPage> {
                       FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))
                     ],
                     decoration: InputDecoration(
-                      labelText: 'ISF (${_glucoseUnit} per U)',
+                      labelText: 'ISF ($_glucoseUnit per U)',
                       hintText:
                           _glucoseUnit == 'mmol/L' ? 'e.g. 2.8' : 'e.g. 50',
                       prefixIcon: const Icon(Icons.local_hospital_outlined),
