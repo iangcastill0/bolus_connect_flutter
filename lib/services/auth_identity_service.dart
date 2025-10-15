@@ -26,18 +26,16 @@ class IdentityAuthService {
       return _auth.signInWithPopup(provider);
     }
 
-    final googleSignIn = GoogleSignIn(scopes: const ['email']);
-    final account = await googleSignIn.signIn();
-    if (account == null) {
-      throw const IdentitySignInAbortedException('Google sign-in aborted');
-    }
-    final authentication = await account.authentication;
+    final googleSignIn = GoogleSignIn.instance;
+    final account = await googleSignIn.authenticate(
+      scopeHint: const ['email'],
+    );
+    final authentication = account.authentication;
     if (authentication.idToken == null) {
       throw const IdentitySignInException('Missing idToken from Google');
     }
 
     final credential = GoogleAuthProvider.credential(
-      accessToken: authentication.accessToken,
       idToken: authentication.idToken,
     );
     return _auth.signInWithCredential(credential);
