@@ -26,7 +26,20 @@ class IdentityAuthService {
       return _auth.signInWithPopup(provider);
     }
 
+    // For Android/iOS, initialize with server client ID from Firebase
+    // This is the Web client ID from google-services.json (client_type: 3)
+    const serverClientId = String.fromEnvironment(
+      'GOOGLE_SERVER_CLIENT_ID',
+      defaultValue: '1000337125532-8c4b58ibs3lm3ev5601141ia03100t37.apps.googleusercontent.com',
+    );
+
     final googleSignIn = GoogleSignIn.instance;
+
+    // Initialize with server client ID for Android
+    await googleSignIn.initialize(
+      serverClientId: serverClientId,
+    );
+
     final account = await googleSignIn.authenticate(
       scopeHint: const ['email'],
     );

@@ -23,7 +23,7 @@
 		<key>CFBundleSignature</key>
 		<string>????</string>
 		<key>CFBundleVersion</key>
-		<string>22</string>
+		<string>25</string>
 		<key>LSRequiresIPhoneOS</key>
 		<true/>
 		<key>UIApplicationSupportsIndirectInputEvents</key>
@@ -47,5 +47,17 @@
 		</array>
 		<key>UIStatusBarHidden</key>
 		<false/>
+		<key>CFBundleURLTypes</key>
+		<array>
+			<dict>
+				<key>CFBundleTypeRole</key>
+				<string>Editor</string>
+				<key>CFBundleURLSchemes</key>
+				<array>
+					<!-- Reversed iOS client ID from GoogleService-Info.plist -->
+					<string>com.googleusercontent.apps.1000337125532-mipfbafa81taoop0j8malgbos24fp661</string>
+				</array>
+			</dict>
+		</array>
 	</dict>
 </plist>
