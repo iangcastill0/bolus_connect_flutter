@@ -23,6 +23,10 @@ class _BolusParametersPageState extends State<BolusParametersPage> {
   String _glucoseUnit = 'mg/dL'; // or 'mmol/L'
   bool _loading = true;
 
+  // Range slider values (stored in mg/dL)
+  double _rangeLowMgdl = 70.0;
+  double _rangeHighMgdl = 180.0;
+
   @override
   void initState() {
     super.initState();
@@ -42,6 +46,11 @@ class _BolusParametersPageState extends State<BolusParametersPage> {
     final unit = prefs.getString('glucoseUnit') ?? 'mg/dL';
     final targetMgdl = _parseDouble(prefs.getString('targetGlucose'));
     final isfMgdl = _parseDouble(prefs.getString('isf'));
+
+    // Load glucose range (defaults: 70-180 mg/dL)
+    _rangeLowMgdl = _parseDouble(prefs.getString('glucoseRangeLow')) ?? 70.0;
+    _rangeHighMgdl = _parseDouble(prefs.getString('glucoseRangeHigh')) ?? 180.0;
+
     setState(() {
       _selectedCgm = prefs.getString('cgmManufacturer') ?? '';
       _glucoseUnit = unit;
@@ -75,6 +84,7 @@ class _BolusParametersPageState extends State<BolusParametersPage> {
     // Parse inputs in current unit
     final target = _parseDouble(_targetController.text);
     final isf = _parseDouble(_isfController.text);
+
     if (target == null || isf == null) {
       return; // safeguard; validators should prevent this
     }
@@ -88,6 +98,8 @@ class _BolusParametersPageState extends State<BolusParametersPage> {
     await prefs.setString('glucoseUnit', _glucoseUnit);
     await prefs.setString('targetGlucose', _formatMgdl(targetMgdl));
     await prefs.setString('isf', _formatMgdl(isfMgdl));
+    await prefs.setString('glucoseRangeLow', _formatMgdl(_rangeLowMgdl));
+    await prefs.setString('glucoseRangeHigh', _formatMgdl(_rangeHighMgdl));
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Bolus parameters saved')),
@@ -112,6 +124,7 @@ class _BolusParametersPageState extends State<BolusParametersPage> {
     // Convert currently entered values to the new unit for display
     final target = _parseDouble(_targetController.text);
     final isf = _parseDouble(_isfController.text);
+
     setState(() {
       if (unit == 'mmol/L') {
         if (target != null) {
@@ -226,6 +239,107 @@ class _BolusParametersPageState extends State<BolusParametersPage> {
                       prefixIcon: const Icon(Icons.local_hospital_outlined),
                     ),
                     validator: (v) => _validatePositive(v, 'ISF'),
+                  ),
+                  const SizedBox(height: 24),
+                  Text(
+                    'Glucose Range',
+                    style: theme.textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Define your target glucose range for tracking and insights.',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Low',
+                            style: theme.textTheme.labelMedium?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            _glucoseUnit == 'mmol/L'
+                                ? _formatMmol(_mgdlToMmol(_rangeLowMgdl))
+                                : _formatMgdl(_rangeLowMgdl),
+                            style: theme.textTheme.headlineSmall?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.red,
+                            ),
+                          ),
+                          Text(
+                            _glucoseUnit,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            'High',
+                            style: theme.textTheme.labelMedium?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            _glucoseUnit == 'mmol/L'
+                                ? _formatMmol(_mgdlToMmol(_rangeHighMgdl))
+                                : _formatMgdl(_rangeHighMgdl),
+                            style: theme.textTheme.headlineSmall?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.green,
+                            ),
+                          ),
+                          Text(
+                            _glucoseUnit,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  RangeSlider(
+                    values: RangeValues(_rangeLowMgdl, _rangeHighMgdl),
+                    min: 40.0,
+                    max: 400.0,
+                    divisions: 360,
+                    labels: RangeLabels(
+                      _glucoseUnit == 'mmol/L'
+                          ? _formatMmol(_mgdlToMmol(_rangeLowMgdl))
+                          : _formatMgdl(_rangeLowMgdl),
+                      _glucoseUnit == 'mmol/L'
+                          ? _formatMmol(_mgdlToMmol(_rangeHighMgdl))
+                          : _formatMgdl(_rangeHighMgdl),
+                    ),
+                    onChanged: (RangeValues values) {
+                      setState(() {
+                        _rangeLowMgdl = values.start;
+                        _rangeHighMgdl = values.end;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Drag the handles to adjust your target range',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                    textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 24),
                   SizedBox(

@@ -20,6 +20,7 @@ class _MainTabsPageState extends State<MainTabsPage> {
   int _index = 0;
   final ValueNotifier<int> _bolusRefreshTick = ValueNotifier<int>(0);
   final ValueNotifier<int> _logsRefreshTick = ValueNotifier<int>(0);
+  final ValueNotifier<int> _homeRefreshTick = ValueNotifier<int>(0);
   final GlobalKey<SettingsPageState> _settingsPageKey =
       GlobalKey<SettingsPageState>();
   bool _openedBolusAfterProfile = false;
@@ -31,7 +32,7 @@ class _MainTabsPageState extends State<MainTabsPage> {
   void initState() {
     super.initState();
     _pages = [
-      const HomePage(),
+      HomePage(refreshTick: _homeRefreshTick),
       LogsPage(refreshTick: _logsRefreshTick),
       BolusPage(
           refreshTick: _bolusRefreshTick, logRefreshTick: _logsRefreshTick),
@@ -45,6 +46,7 @@ class _MainTabsPageState extends State<MainTabsPage> {
   void dispose() {
     _bolusRefreshTick.dispose();
     _logsRefreshTick.dispose();
+    _homeRefreshTick.dispose();
     super.dispose();
   }
 
@@ -56,7 +58,9 @@ class _MainTabsPageState extends State<MainTabsPage> {
         selectedIndex: _index,
         onDestinationSelected: (i) {
           setState(() => _index = i);
-          if (i == 2) {
+          if (i == 0) {
+            _homeRefreshTick.value++;
+          } else if (i == 2) {
             _bolusRefreshTick.value++;
           }
         },
