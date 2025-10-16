@@ -630,7 +630,7 @@ class _BolusPageState extends State<BolusPage> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Text('Recommended total',
+                            const Text('Suggested total',
                                 style: TextStyle(fontWeight: FontWeight.w600)),
                             Text('${_totalBolus!.toStringAsFixed(1)} U',
                                 style: const TextStyle(
