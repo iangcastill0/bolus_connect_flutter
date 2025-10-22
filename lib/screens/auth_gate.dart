@@ -5,8 +5,10 @@ import 'login_page.dart';
 import 'welcome_page.dart';
 import 'main_tabs_page.dart';
 import 'animated_splash_screen.dart';
+import 'locale_setup_page.dart';
 import '../services/consent_service.dart';
 import '../services/guest_session_service.dart';
+import '../services/locale_preference_service.dart';
 
 class AuthGate extends StatefulWidget {
   const AuthGate({super.key});
@@ -17,9 +19,12 @@ class AuthGate extends StatefulWidget {
 
 class _AuthGateState extends State<AuthGate> {
   bool? _disclaimerAccepted;
+  bool? _localeSetupCompleted;
   bool _showAnimatedSplash = true;
   bool _splashCompleted = false;
   static const ConsentService _consentService = ConsentService();
+  static const LocalePreferenceService _localeService =
+      LocalePreferenceService();
   final GuestSessionService _guestService = GuestSessionService.instance;
   GuestProfile? _guestProfile;
   VoidCallback? _guestListener;
@@ -48,11 +53,14 @@ class _AuthGateState extends State<AuthGate> {
     debugPrint('📋 AuthGate: Loading disclaimer preference');
     final accepted = await _consentService.hasAcceptedLatestDisclaimer();
     debugPrint('📋 AuthGate: Disclaimer accepted (latest version) = $accepted');
+    final localeSetup = await _localeService.hasCompletedSetup();
+    debugPrint('🌍 AuthGate: Locale setup completed = $localeSetup');
     final guest = await _guestService.loadProfile();
 
     // Store the value but DON'T trigger setState yet
     // This prevents rebuilds from interrupting the splash screen
     _disclaimerAccepted = accepted;
+    _localeSetupCompleted = localeSetup;
     _guestProfile = guest;
   }
 
@@ -76,7 +84,7 @@ class _AuthGateState extends State<AuthGate> {
     }
 
     // After splash completes, check if we're still loading data
-    if (_disclaimerAccepted == null) {
+    if (_disclaimerAccepted == null || _localeSetupCompleted == null) {
       return const _Splash();
     }
 
@@ -98,11 +106,22 @@ class _AuthGateState extends State<AuthGate> {
           return const MainTabsPage();
         }
 
-        // Not signed in
+        // Not signed in - check onboarding flow
+        // Step 1: Show welcome page if not started
+        // Step 2: Show locale setup if welcome page was accepted but locale not set
+        // Step 3: Show disclaimer if locale is set but disclaimer not accepted
+        // Step 4: Show login page if everything is accepted
         if (_disclaimerAccepted == true) {
           return const LoginPage();
         }
-        return const WelcomePage();
+
+        if (_localeSetupCompleted == true) {
+          // Locale setup done, but disclaimer not yet accepted
+          return const WelcomePage();
+        }
+
+        // Nothing completed yet, start with locale setup
+        return const LocaleSetupPage();
       },
     );
   }

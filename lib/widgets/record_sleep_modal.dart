@@ -25,8 +25,27 @@ class _RecordSleepModalState extends State<RecordSleepModal> {
     'Poor',
     'Fair',
     'Good',
+    'Very Good',
     'Excellent',
   ];
+
+  // Map display names to canonical quality values (1-5 scale)
+  int _getCanonicalQuality(String displayQuality) {
+    switch (displayQuality) {
+      case 'Poor':
+        return 1;
+      case 'Fair':
+        return 2;
+      case 'Good':
+        return 3;
+      case 'Very Good':
+        return 4;
+      case 'Excellent':
+        return 5;
+      default:
+        return 3;
+    }
+  }
 
   @override
   void dispose() {
@@ -118,6 +137,20 @@ class _RecordSleepModalState extends State<RecordSleepModal> {
       if (_notes.trim().isNotEmpty) _notes.trim(),
     ].join('\n');
 
+    // Calculate bedtime from wakeup time and duration
+    // _selectedDateTime is the wakeup time
+    final bedtime =
+        _selectedDateTime.subtract(Duration(minutes: (hoursValue * 60).round()));
+
+    // Create canonical sleep log structure
+    final sleepLog = SleepLog(
+      bedtime: bedtime,
+      wakeup: _selectedDateTime,
+      durationH: hoursValue,
+      quality: _getCanonicalQuality(_quality),
+      note: _notes.trim().isNotEmpty ? _notes.trim() : null,
+    );
+
     final entry = BolusLogEntry(
       timestamp: _selectedDateTime,
       glucose: null,
@@ -128,6 +161,7 @@ class _RecordSleepModalState extends State<RecordSleepModal> {
       trendAdjustment: 0,
       totalBolus: 0,
       notes: fullNotes,
+      sleepLog: sleepLog, // Canonical structure
     );
 
     await BolusLogService.addEntry(entry);

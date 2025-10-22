@@ -105,6 +105,13 @@ class _AddMoodModalState extends State<AddMoodModal> {
       if (_notes.trim().isNotEmpty) _notes.trim(),
     ].join('\n');
 
+    // Create canonical mood log structure
+    final moodLog = MoodLog(
+      ts: _selectedDateTime,
+      stress: _stressLevel.toInt(),
+      note: _notes.trim().isNotEmpty ? _notes.trim() : null,
+    );
+
     final entry = BolusLogEntry(
       timestamp: _selectedDateTime,
       glucose: null,
@@ -115,6 +122,7 @@ class _AddMoodModalState extends State<AddMoodModal> {
       trendAdjustment: 0,
       totalBolus: 0,
       notes: fullNotes,
+      moodLog: moodLog, // Canonical structure
     );
 
     await BolusLogService.addEntry(entry);

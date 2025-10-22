@@ -25,12 +25,26 @@ class _HomePageState extends State<HomePage> {
   GlucoseStatistics? _stats;
   List<InsightCard> _insights = [];
   bool _loading = true;
+  String _coachingHint = '';
+
+  // Coaching hints that rotate based on app opens
+  static const List<String> _coachingHints = [
+    'Try checking your glucose two hours after lunch today.',
+    'Evening walks help reduce next-day highs.',
+    'Stable sleep equals stable glucose variability.',
+    'Protein before carbs can help stabilize post-meal spikes.',
+    'Stress management techniques may improve your glucose control.',
+    'Consistent meal timing supports better glucose patterns.',
+    'Light activity after meals can help lower glucose levels.',
+    'Hydration plays a key role in glucose management.',
+  ];
 
   @override
   void initState() {
     super.initState();
     widget.refreshTick?.addListener(_handleRefreshTick);
     _loadData();
+    _selectCoachingHint();
   }
 
   @override
@@ -50,6 +64,15 @@ class _HomePageState extends State<HomePage> {
 
   void _handleRefreshTick() {
     _loadData();
+  }
+
+  void _selectCoachingHint() {
+    // Rotate hints based on current day to keep it fresh but stable throughout the day
+    final dayOfYear = DateTime.now().difference(DateTime(DateTime.now().year, 1, 1)).inDays;
+    final hintIndex = dayOfYear % _coachingHints.length;
+    setState(() {
+      _coachingHint = _coachingHints[hintIndex];
+    });
   }
 
   Future<void> _loadData() async {
@@ -363,6 +386,7 @@ class _HomePageState extends State<HomePage> {
                     : stats.averageGlucose.toStringAsFixed(0),
                 unit: stats.glucoseUnit,
                 icon: Icons.show_chart,
+                color: _getGlucoseColor(stats.averageGlucose, stats),
               ),
             ),
             const SizedBox(width: 12),
@@ -395,6 +419,7 @@ class _HomePageState extends State<HomePage> {
                 label: 'Status',
                 value: stats.getTimeInRangeLabel(),
                 icon: Icons.check_circle_outline,
+                color: _getStatusColor(stats),
               ),
             ),
           ],
@@ -436,6 +461,68 @@ class _HomePageState extends State<HomePage> {
             label: const Text('View Full History'),
           ),
         ),
+        const SizedBox(height: 32),
+        // Coaching Hint Banner
+        if (_coachingHint.isNotEmpty) ...[
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
+                  theme.colorScheme.secondaryContainer.withValues(alpha: 0.3),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: theme.colorScheme.primary.withValues(alpha: 0.2),
+                width: 1,
+              ),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primary.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    Icons.lightbulb_outline,
+                    color: theme.colorScheme.primary,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Coach Hint',
+                        style: theme.textTheme.labelLarge?.copyWith(
+                          color: theme.colorScheme.primary,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        _coachingHint,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
       ],
     );
   }
@@ -483,6 +570,11 @@ class _HomePageState extends State<HomePage> {
     } else {
       return Colors.red;
     }
+  }
+
+  Color _getStatusColor(GlucoseStatistics stats) {
+    // Use the same logic as glucose color for consistency
+    return _getGlucoseColor(stats.averageGlucose, stats);
   }
 }
 

@@ -179,11 +179,12 @@ class _RegionOption {
   final String glucoseUnit;
 }
 
+// Canonical: profile.sex_at_birth (enum: male|female|intersex|other)
 const List<_LabeledOption> _sexOptions = [
   _LabeledOption('female', 'Female'),
   _LabeledOption('male', 'Male'),
-  _LabeledOption('non_binary', 'Non-binary'),
-  _LabeledOption('prefer_not_to_say', 'Prefer not to say'),
+  _LabeledOption('intersex', 'Intersex'),
+  _LabeledOption('other', 'Other/Prefer not to say'),
 ];
 
 const List<_RegionOption> _regionOptions = [
@@ -195,21 +196,24 @@ const List<_RegionOption> _regionOptions = [
   _RegionOption(code: 'OTHER', label: 'Other', glucoseUnit: 'mg/dL'),
 ];
 
+// Canonical: profile.diabetes_type (enum: T1D|T2D|Prediabetes|Monitoring)
 const List<_LabeledOption> _diabetesTypeOptions = [
-  _LabeledOption('type1', 'Type 1'),
-  _LabeledOption('type2', 'Type 2'),
-  _LabeledOption('prediabetes', 'Prediabetes'),
-  _LabeledOption('monitoring_only', 'Monitoring only'),
+  _LabeledOption('T1D', 'Type 1 Diabetes'),
+  _LabeledOption('T2D', 'Type 2 Diabetes'),
+  _LabeledOption('Prediabetes', 'Prediabetes'),
+  _LabeledOption('Monitoring', 'Monitoring only'),
 ];
 
+// Canonical: profile.therapy (enum: MDI|Pump|NonInsulin|DietExercise|None)
 const List<_LabeledOption> _treatmentOptions = [
-  _LabeledOption('mdi', 'Multiple daily injections (MDI)'),
-  _LabeledOption('pump', 'Insulin pump'),
-  _LabeledOption('non_insulin_medication', 'Non-insulin medication'),
-  _LabeledOption('diet_exercise', 'Diet & exercise'),
-  _LabeledOption('none', 'None'),
+  _LabeledOption('MDI', 'Multiple daily injections (MDI)'),
+  _LabeledOption('Pump', 'Insulin pump'),
+  _LabeledOption('NonInsulin', 'Non-insulin medication'),
+  _LabeledOption('DietExercise', 'Diet & exercise'),
+  _LabeledOption('None', 'None'),
 ];
 
+// Canonical: profile.comorbidities[] (set: hypertension|dyslipidemia|thyroid|sleep_apnea|pcos|none)
 const List<_LabeledOption> _conditionOptions = [
   _LabeledOption('hypertension', 'Hypertension'),
   _LabeledOption('dyslipidemia', 'Dyslipidemia'),
@@ -219,16 +223,18 @@ const List<_LabeledOption> _conditionOptions = [
   _LabeledOption('none', 'None'),
 ];
 
+// Canonical: profile.meds[] (set: metformin|glp1|sglt2|basal_ins|bolus_ins|other)
 const List<_LabeledOption> _medicationOptions = [
   _LabeledOption('metformin', 'Metformin'),
   _LabeledOption('glp1', 'GLP-1 receptor agonist'),
   _LabeledOption('sglt2', 'SGLT2 inhibitor'),
-  _LabeledOption('basal_insulin', 'Basal insulin'),
-  _LabeledOption('bolus_insulin', 'Bolus insulin'),
+  _LabeledOption('basal_ins', 'Basal insulin'),
+  _LabeledOption('bolus_ins', 'Bolus insulin'),
   _LabeledOption('other', 'Other'),
   _LabeledOption('none', 'None'),
 ];
 
+// Canonical: lifestyle.work_pattern (enum: daytime|shift|irregular|student|retired)
 const List<_LabeledOption> _workPatternOptions = [
   _LabeledOption('daytime', 'Daytime'),
   _LabeledOption('shift', 'Shift work'),
@@ -237,12 +243,14 @@ const List<_LabeledOption> _workPatternOptions = [
   _LabeledOption('retired', 'Retired'),
 ];
 
+// Canonical: lifestyle.breakfast_habit (enum: daily|sometimes|never)
 const List<_LabeledOption> _breakfastHabitOptions = [
-  _LabeledOption('every_day', 'Every day'),
+  _LabeledOption('daily', 'Every day'),
   _LabeledOption('sometimes', 'Sometimes'),
   _LabeledOption('never', 'Never'),
 ];
 
+// Canonical: lifestyle.caffeine_per_day (enum: none|1_2|3_5|gt5)
 const List<_LabeledOption> _caffeineOptions = [
   _LabeledOption('none', 'None'),
   _LabeledOption('1_2', '1–2 cups'),
@@ -250,18 +258,21 @@ const List<_LabeledOption> _caffeineOptions = [
   _LabeledOption('gt5', 'More than 5 cups'),
 ];
 
+// Canonical: lifestyle.alcohol_freq (enum: never|occasional|several_per_week|daily)
 const List<_LabeledOption> _alcoholOptions = [
   _LabeledOption('never', 'Never'),
-  _LabeledOption('occasionally', 'Occasionally'),
-  _LabeledOption('several_week', 'Several times a week'),
+  _LabeledOption('occasional', 'Occasionally'),
+  _LabeledOption('several_per_week', 'Several times a week'),
   _LabeledOption('daily', 'Daily'),
 ];
 
+// Canonical: lifestyle.smoker (bool - converted from yes/no)
 const List<_LabeledOption> _smokingOptions = [
   _LabeledOption('yes', 'Yes'),
   _LabeledOption('no', 'No'),
 ];
 
+// Canonical: lifestyle.perceived_energy (enum: low|moderate|high)
 const List<_LabeledOption> _energyLevelOptions = [
   _LabeledOption('low', 'Low'),
   _LabeledOption('moderate', 'Moderate'),
@@ -870,7 +881,6 @@ class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
                           .toList(),
                       onChanged: (value) {
                         setState(() => _gender = value);
-                        _genderFieldKey.currentState?.didChange(value);
                         _persistProfileDraft(); // Auto-save on selection change
                         if (value == null) {
                           _updateFieldValidity(_FieldId.gender, false);
@@ -1069,7 +1079,6 @@ class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
                           .toList(),
                       onChanged: (value) {
                         setState(() => _diabetesType = value);
-                        _diabetesTypeFieldKey.currentState?.didChange(value);
                         _persistProfileDraft(); // Auto-save on selection change
                         if (value == null) {
                           _updateFieldValidity(_FieldId.diabetesType, false);
@@ -1104,7 +1113,6 @@ class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
                           .toList(),
                       onChanged: (value) {
                         setState(() => _treatment = value);
-                        _treatmentFieldKey.currentState?.didChange(value);
                         _persistProfileDraft(); // Auto-save on selection change
                         if (value == null) {
                           _updateFieldValidity(_FieldId.treatment, false);
@@ -1218,7 +1226,7 @@ class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
 
     final gender = data['gender'] as String? ?? data['sexAtBirth'] as String?;
     if (gender != null && gender.isNotEmpty) {
-      _gender = gender;
+      _gender = _migrateGender(gender);
     }
 
     final height = _castToDouble(data['heightCm'] ?? data['height']);
@@ -1250,13 +1258,13 @@ class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
 
     final diabetesType = data['diabetesType'] as String?;
     if (diabetesType != null && diabetesType.isNotEmpty) {
-      _diabetesType = diabetesType;
+      _diabetesType = _migrateDiabetesType(diabetesType);
     }
 
     final treatment =
         data['treatment'] as String? ?? data['currentTreatment'] as String?;
     if (treatment != null && treatment.isNotEmpty) {
-      _treatment = treatment;
+      _treatment = _migrateTherapy(treatment);
     }
 
     final conditionsRaw = data['conditions'];
@@ -1273,7 +1281,9 @@ class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
       _medications
         ..clear()
         ..addAll(
-          medicationsRaw.map((e) => e.toString()).where((e) => e.isNotEmpty),
+          medicationsRaw
+              .map((e) => _migrateMedication(e.toString()))
+              .where((e) => e.isNotEmpty),
         );
     }
 
@@ -1327,6 +1337,47 @@ class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
     // Refresh derived metrics to ensure BMI reflects current inputs.
     _updateDerivedMetrics();
     _refreshInitialValidity();
+  }
+
+  /// Migrates old gender/sex values to new canonical values
+  String _migrateGender(String oldValue) {
+    const migration = {
+      'non_binary': 'other',
+      'prefer_not_to_say': 'other',
+    };
+    return migration[oldValue] ?? oldValue;
+  }
+
+  /// Migrates old diabetes type values to new canonical values
+  String _migrateDiabetesType(String oldValue) {
+    const migration = {
+      'type1': 'T1D',
+      'type2': 'T2D',
+      'prediabetes': 'Prediabetes',
+      'monitoring_only': 'Monitoring',
+    };
+    return migration[oldValue] ?? oldValue;
+  }
+
+  /// Migrates old therapy/treatment values to new canonical values
+  String _migrateTherapy(String oldValue) {
+    const migration = {
+      'mdi': 'MDI',
+      'pump': 'Pump',
+      'non_insulin_medication': 'NonInsulin',
+      'diet_exercise': 'DietExercise',
+      'none': 'None',
+    };
+    return migration[oldValue] ?? oldValue;
+  }
+
+  /// Migrates old medication values to new canonical values
+  String _migrateMedication(String oldValue) {
+    const migration = {
+      'basal_insulin': 'basal_ins',
+      'bolus_insulin': 'bolus_ins',
+    };
+    return migration[oldValue] ?? oldValue;
   }
 
   Future<void> _pickDateOfBirth() async {
@@ -1664,6 +1715,15 @@ class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
         ?.toString();
     final existingSyncedAt = widget.initialAnswers?['lastSyncedAt']?.toString();
 
+    // Calculate age from date of birth
+    final today = DateTime.now();
+    final age = today.year -
+        _dob!.year -
+        (today.month > _dob!.month ||
+                (today.month == _dob!.month && today.day >= _dob!.day)
+            ? 0
+            : 1);
+
     final answers = <String, dynamic>{
       'fullName': _nameController.text.trim(),
       'dateOfBirth': _dob!.toIso8601String(),
@@ -1679,6 +1739,19 @@ class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
       'medications': _medications.toList(),
       'completedAt': existingCompletedAt ?? nowIso,
       'updatedAt': nowIso,
+      // Canonical keys from data dictionary
+      'profile': {
+        'age_years': age,
+        'sex_at_birth': _gender,
+        'height_cm': heightCm,
+        'weight_kg': weightKg,
+        'bmi': bmi,
+        'region': _countryCode,
+        'diabetes_type': _diabetesType,
+        'therapy': _treatment,
+        'comorbidities': _conditions.toList(),
+        'meds': _medications.toList(),
+      },
     };
 
     if (existingSyncedAt != null) {
@@ -1857,7 +1930,6 @@ class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
         _glucoseUnit = region.glucoseUnit;
       }
     });
-    _countryFieldKey.currentState?.didChange(code);
     _validateDropdownField(_FieldId.country, _countryFieldKey);
     _persistProfileDraft(); // Auto-save on country selection
   }
@@ -2022,6 +2094,7 @@ class _LifestyleAnswers {
 
   Map<String, dynamic> toMap() {
     return {
+      // Legacy keys (for backward compatibility)
       'wakeUpTime': _formatTimeOfDay(wakeUpTime),
       'bedtime': _formatTimeOfDay(bedtime),
       'sleepDurationHours': sleepDurationHours,
@@ -2034,6 +2107,21 @@ class _LifestyleAnswers {
       'alcoholConsumption': alcoholConsumption,
       'smokingStatus': smokingStatus,
       'energyLevel': energyLevel,
+      // Canonical keys from data dictionary
+      'canonical': {
+        'wakeup_time_local': _formatTimeOfDay(wakeUpTime),
+        'bedtime_local': _formatTimeOfDay(bedtime),
+        'sleep_duration_h': sleepDurationHours,
+        'sleep_quality_likert': sleepQuality,
+        'work_pattern': workPattern,
+        'breakfast_habit': breakfastHabit,
+        'meals_per_day': mealsPerDay,
+        'dinner_time_local': _formatTimeOfDay(dinnerTime),
+        'caffeine_per_day': caffeineIntake,
+        'alcohol_freq': alcoholConsumption,
+        'smoker': smokingStatus == 'yes',
+        'perceived_energy': energyLevel,
+      },
     };
   }
 }
@@ -2178,9 +2266,11 @@ class _LifestyleQuestionnairePageState
       _mealsPerDay = meals.clamp(1, 6).round();
     }
     _workPattern = data['workPattern']?.toString();
-    _breakfastHabit = data['breakfastHabit']?.toString();
+    final breakfast = data['breakfastHabit']?.toString();
+    _breakfastHabit = breakfast != null ? _migrateBreakfastHabit(breakfast) : null;
     _caffeineIntake = data['caffeineIntake']?.toString();
-    _alcoholConsumption = data['alcoholConsumption']?.toString();
+    final alcohol = data['alcoholConsumption']?.toString();
+    _alcoholConsumption = alcohol != null ? _migrateAlcoholFreq(alcohol) : null;
     _smokingStatus = data['smokingStatus']?.toString();
     _energyLevel = data['energyLevel']?.toString();
     _initialActivity = widget.initialActivityAnswers;
@@ -2533,6 +2623,23 @@ class _LifestyleQuestionnairePageState
     );
   }
 
+  /// Migrates old breakfast habit values to canonical values
+  String _migrateBreakfastHabit(String oldValue) {
+    const migration = {
+      'every_day': 'daily',
+    };
+    return migration[oldValue] ?? oldValue;
+  }
+
+  /// Migrates old alcohol frequency values to canonical values
+  String _migrateAlcoholFreq(String oldValue) {
+    const migration = {
+      'occasionally': 'occasional',
+      'several_week': 'several_per_week',
+    };
+    return migration[oldValue] ?? oldValue;
+  }
+
   void _goToLifestyleSection2() {
     // Validate section 1 fields before proceeding
     FocusScope.of(context).unfocus();
@@ -2737,6 +2844,8 @@ class _LifestyleQuestionnairePageState
   }
 }
 
+/// Physical Activity answers based on IPAQ-SF (International Physical Activity Questionnaire - Short Form)
+/// Canonical keys: activity.vig_days_per_week, activity.vig_min_per_day, etc.
 class _ActivityAnswers {
   const _ActivityAnswers({
     required this.vigorousDays,
@@ -2748,14 +2857,16 @@ class _ActivityAnswers {
     required this.sittingHours,
   });
 
-  final int vigorousDays;
-  final double vigorousMinutes;
-  final int moderateDays;
-  final double moderateMinutes;
-  final int walkingDays;
-  final double walkingMinutes;
-  final double sittingHours;
+  final int vigorousDays; // activity.vig_days_per_week
+  final double vigorousMinutes; // activity.vig_min_per_day
+  final int moderateDays; // activity.mod_days_per_week
+  final double moderateMinutes; // activity.mod_min_per_day
+  final int walkingDays; // activity.walk_days_per_week
+  final double walkingMinutes; // activity.walk_min_per_day
+  final double sittingHours; // activity.sitting_hours_per_day
 
+  /// Canonical: activity.met_minutes_week
+  /// Formula: 8.0*vig_days*vig_min + 4.0*mod_days*mod_min + 3.3*walk_days*walk_min
   double get metMinutesWeek =>
       (vigorousDays * vigorousMinutes * 8.0) +
       (moderateDays * moderateMinutes * 4.0) +
@@ -2777,6 +2888,7 @@ class _ActivityAnswers {
 
   Map<String, dynamic> toMap() {
     return {
+      // Legacy keys (for backward compatibility)
       'vigorousDaysPerWeek': vigorousDays,
       'vigorousMinutesPerDay': vigorousMinutes,
       'moderateDaysPerWeek': moderateDays,
@@ -2787,14 +2899,40 @@ class _ActivityAnswers {
       'metMinutesWeek': metMinutesWeek,
       'activityIndex': activityIndex,
       'activityLevel': activityLevel,
+      // Canonical keys from data dictionary (IPAQ-SF adapted)
+      'canonical': {
+        'vig_days_per_week': vigorousDays,
+        'vig_min_per_day': vigorousMinutes,
+        'mod_days_per_week': moderateDays,
+        'mod_min_per_day': moderateMinutes,
+        'walk_days_per_week': walkingDays,
+        'walk_min_per_day': walkingMinutes,
+        'sitting_hours_per_day': sittingHours,
+        'met_minutes_week': metMinutesWeek,
+      },
     };
   }
 }
 
+/// Perceived Stress Scale - 4 item version (PSS-4)
+/// Canonical keys: stress.pss4_item1..4, stress.pss4_score
 class _StressAnswers {
   const _StressAnswers({required this.responses});
 
-  final List<int> responses;
+  final List<int> responses; // 4 items, each 0-4 Likert scale
+
+  /// PSS-4 score with reverse-coded items (items 2 and 3)
+  /// Items 2 ("confident handling problems") and 3 ("things going your way") are positive
+  /// and need to be reverse-coded: reversed = 4 - original
+  /// Total score range: 0-16
+  int get pss4Score {
+    if (responses.length != 4) return 0;
+    final item1 = responses[0]; // Felt unable to control (direct)
+    final item2 = 4 - responses[1]; // Felt confident (REVERSE)
+    final item3 = 4 - responses[2]; // Things going your way (REVERSE)
+    final item4 = responses[3]; // Difficulties piling up (direct)
+    return item1 + item2 + item3 + item4;
+  }
 
   double get normalizedScore {
     final total = responses.fold<int>(0, (sum, value) => sum + value);
@@ -2802,14 +2940,36 @@ class _StressAnswers {
   }
 
   Map<String, dynamic> toMap() {
-    return {'items': responses, 'index': normalizedScore};
+    return {
+      // Legacy keys
+      'items': responses,
+      'index': normalizedScore,
+      // Canonical keys from data dictionary (PSS-4)
+      'canonical': {
+        'pss4_item1': responses.length > 0 ? responses[0] : 0,
+        'pss4_item2': responses.length > 1 ? responses[1] : 0,
+        'pss4_item3': responses.length > 2 ? responses[2] : 0,
+        'pss4_item4': responses.length > 3 ? responses[3] : 0,
+        'pss4_score': pss4Score, // 0-16 with reverse-coded items
+      },
+    };
   }
 }
 
+/// Insomnia Severity Index - 7 item version (ISI-7)
+/// Canonical keys: sleep.isi_item1..7, sleep.isi_score
 class _SleepAnswers {
   const _SleepAnswers({required this.responses});
 
-  final List<int> responses;
+  final List<int> responses; // 7 items, each 0-4 Likert scale
+
+  /// ISI-7 total score (sum of all 7 items)
+  /// Score range: 0-28
+  /// Interpretation: 0-7 = no insomnia, 8-14 = subthreshold, 15-21 = moderate, 22-28 = severe
+  int get isiScore {
+    if (responses.length != 7) return 0;
+    return responses.fold<int>(0, (sum, value) => sum + value);
+  }
 
   double get normalizedScore {
     final total = responses.fold<int>(0, (sum, value) => sum + value);
@@ -2820,7 +2980,22 @@ class _SleepAnswers {
   }
 
   Map<String, dynamic> toMap() {
-    return {'items': responses, 'index': normalizedScore};
+    return {
+      // Legacy keys
+      'items': responses,
+      'index': normalizedScore,
+      // Canonical keys from data dictionary (ISI-7)
+      'canonical': {
+        'isi_item1': responses.isNotEmpty ? responses[0] : 0,
+        'isi_item2': responses.length > 1 ? responses[1] : 0,
+        'isi_item3': responses.length > 2 ? responses[2] : 0,
+        'isi_item4': responses.length > 3 ? responses[3] : 0,
+        'isi_item5': responses.length > 4 ? responses[4] : 0,
+        'isi_item6': responses.length > 5 ? responses[5] : 0,
+        'isi_item7': responses.length > 6 ? responses[6] : 0,
+        'isi_score': isiScore, // 0-28 total score
+      },
+    };
   }
 }
 
@@ -3390,18 +3565,67 @@ class _StressSleepNavigationResult {
   final Map<String, dynamic>? psych;
 }
 
+/// Nutrition assessment (REAP-S adapted with glycemic add-ons)
+/// Canonical keys: nutrition.instrument, nutrition.raw_score, nutrition.sugary_drinks_per_week, etc.
 class _NutritionAnswers {
   const _NutritionAnswers({required this.responses});
 
-  final List<int> responses;
+  final List<int> responses; // 7 items, each 0-4 scale
+
+  /// Raw nutrition score (sum of all responses)
+  /// Higher score = better nutrition habits
+  int get rawScore {
+    return responses.fold<int>(0, (sum, value) => sum + value);
+  }
 
   double get index {
     final total = responses.fold<int>(0, (sum, value) => sum + value);
     return (total / (responses.length * 4)) * 100;
   }
 
+  /// Glycemic-specific extractions from questionnaire items
+  /// Item 0: Fruit and vegetable servings (0-4 scale, maps to servings)
+  int get vegetablesServingsPerDay {
+    if (responses.isEmpty) return 0;
+    // Scale: 0=rarely, 1=1-2, 2=3-4, 3=5-6, 4=7+
+    // Map to approximate servings: 0→0, 1→2, 2→4, 3→6, 4→8
+    return responses[0] * 2;
+  }
+
+  /// Item 3: Sugary drinks per week (0-4 scale)
+  int get sugaryDrinksPerWeek {
+    if (responses.length < 4) return 0;
+    // Scale: 0=never, 1=1-2, 2=3-4, 3=5-6, 4=7+
+    // Map to approximate count: 0→0, 1→2, 2→4, 3→6, 4→8
+    return responses[3] * 2;
+  }
+
+  /// Item 2: Frequency of fried/high-fat foods (inverse for refined carbs proxy)
+  /// Lower score = better (less fried foods)
+  String get refinedCarbsFrequency {
+    if (responses.length < 3) return 'rarely';
+    final score = responses[2];
+    if (score == 0) return 'rarely';
+    if (score == 1) return 'sometimes';
+    if (score <= 2) return 'often';
+    return 'daily';
+  }
+
   Map<String, dynamic> toMap() {
-    return {'items': responses, 'index': index};
+    return {
+      // Legacy keys
+      'items': responses,
+      'index': index,
+      // Canonical keys from data dictionary (REAP-S + glycemic add-ons)
+      'canonical': {
+        'instrument': 'reap_s', // REAP-S adapted
+        'raw_score': rawScore,
+        // Glycemic add-ons
+        'vegetables_servings_per_day': vegetablesServingsPerDay,
+        'sugary_drinks_per_week': sugaryDrinksPerWeek,
+        'refined_carbs_frequency': refinedCarbsFrequency,
+      },
+    };
   }
 }
 
@@ -3597,11 +3821,41 @@ class _PsychResult {
 
   bool get supportNeeded => distressIndex > 60;
 
+  /// Canonical: psych.instrument
+  /// Determined by number of items: 5 items = PAID-5, 2 items = DDS-2
+  String get instrument {
+    if (responses.length == 2) return 'dds2';
+    if (responses.length == 5) return 'paid5';
+    return 'paid5'; // default
+  }
+
+  /// Canonical: psych.raw_score
+  /// Sum of all responses (0-4 scale each)
+  /// PAID-5: 0-20 (5 items × 4 max)
+  /// DDS-2: 0-12 (2 items × 6 max for DDS-2, but we use 0-4 scale = 0-8)
+  /// Note: Current implementation uses 5 items (PAID-5) with 0-4 scale = 0-20 range
+  int get rawScore {
+    return responses.fold<int>(0, (sum, value) => sum + value);
+  }
+
   Map<String, dynamic> toMap() {
     return {
+      // Legacy keys (for backward compatibility)
       'items': responses,
       'index': distressIndex,
       'supportNeeded': supportNeeded,
+
+      // Canonical keys from data dictionary
+      'canonical': {
+        'instrument': instrument, // paid5|dds2
+        'raw_score': rawScore, // 0-20 for PAID-5; 0-12 for DDS-2
+        // Individual items for granular analysis
+        'paid5_item1': responses.isNotEmpty ? responses[0] : 0,
+        'paid5_item2': responses.length > 1 ? responses[1] : 0,
+        'paid5_item3': responses.length > 2 ? responses[2] : 0,
+        'paid5_item4': responses.length > 3 ? responses[3] : 0,
+        'paid5_item5': responses.length > 4 ? responses[4] : 0,
+      },
     };
   }
 }

@@ -6,6 +6,8 @@ import 'screens/main_tabs_page.dart';
 import 'screens/auth_gate.dart';
 import 'screens/bolus_parameters_page.dart';
 import 'screens/glucose_log_view.dart';
+import 'screens/locale_setup_page.dart';
+import 'screens/account_settings_page.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -60,11 +62,13 @@ class MyApp extends StatelessWidget {
       // Use an auth gate so signed-in users stay signed in
       home: const AuthGate(),
       routes: {
+        '/locale-setup': (context) => const LocaleSetupPage(),
         '/welcome': (context) => const WelcomePage(),
         '/login': (context) => const LoginPage(),
         '/disclaimer': (context) => const DisclaimerPage(),
         // After login, show the 4-tab scaffold
         '/home': (context) => const MainTabsPage(),
+        '/settings/account': (context) => const AccountSettingsPage(),
         '/settings/bolus-parameters': (context) => const BolusParametersPage(),
         '/glucose-log': (context) => const GlucoseLogView(),
       },

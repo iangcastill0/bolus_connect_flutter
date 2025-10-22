@@ -2,6 +2,112 @@ import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
+/// Canonical exercise log structure
+/// Corresponds to logs.exercise[] from data dictionary
+class ExerciseLog {
+  const ExerciseLog({
+    required this.ts,
+    required this.type,
+    required this.durationMin,
+    required this.intensity,
+    this.rpe,
+    this.note,
+  });
+
+  final DateTime ts;
+  final String type; // e.g., "Running", "Swimming", "Walking"
+  final int durationMin;
+  final String intensity; // "low" | "mod" | "vig"
+  final int? rpe; // Rate of Perceived Exertion (1-10 scale)
+  final String? note;
+
+  Map<String, dynamic> toMap() => {
+        'ts': ts.toIso8601String(),
+        'type': type,
+        'duration_min': durationMin,
+        'intensity': intensity,
+        if (rpe != null) 'rpe_1_10': rpe,
+        if (note != null) 'note': note,
+      };
+
+  factory ExerciseLog.fromMap(Map<String, dynamic> map) {
+    return ExerciseLog(
+      ts: DateTime.tryParse(map['ts'] as String? ?? '') ?? DateTime.now(),
+      type: map['type'] as String? ?? '',
+      durationMin: map['duration_min'] as int? ?? 0,
+      intensity: map['intensity'] as String? ?? 'mod',
+      rpe: map['rpe_1_10'] as int?,
+      note: map['note'] as String?,
+    );
+  }
+}
+
+/// Canonical sleep log structure
+/// Corresponds to logs.sleep[] from data dictionary
+class SleepLog {
+  const SleepLog({
+    required this.bedtime,
+    required this.wakeup,
+    required this.durationH,
+    required this.quality,
+    this.note,
+  });
+
+  final DateTime bedtime;
+  final DateTime wakeup;
+  final double durationH;
+  final int quality; // 1-5 scale
+  final String? note;
+
+  Map<String, dynamic> toMap() => {
+        'bedtime': bedtime.toIso8601String(),
+        'wakeup': wakeup.toIso8601String(),
+        'duration_h': durationH,
+        'quality_1_5': quality,
+        if (note != null) 'note': note,
+      };
+
+  factory SleepLog.fromMap(Map<String, dynamic> map) {
+    return SleepLog(
+      bedtime: DateTime.tryParse(map['bedtime'] as String? ?? '') ??
+          DateTime.now(),
+      wakeup: DateTime.tryParse(map['wakeup'] as String? ?? '') ??
+          DateTime.now(),
+      durationH: (map['duration_h'] as num?)?.toDouble() ?? 0.0,
+      quality: map['quality_1_5'] as int? ?? 3,
+      note: map['note'] as String?,
+    );
+  }
+}
+
+/// Canonical mood log structure
+/// Corresponds to logs.mood[] from data dictionary
+class MoodLog {
+  const MoodLog({
+    required this.ts,
+    required this.stress,
+    this.note,
+  });
+
+  final DateTime ts;
+  final int stress; // 1-5 scale
+  final String? note;
+
+  Map<String, dynamic> toMap() => {
+        'ts': ts.toIso8601String(),
+        'stress_1_5': stress,
+        if (note != null) 'note': note,
+      };
+
+  factory MoodLog.fromMap(Map<String, dynamic> map) {
+    return MoodLog(
+      ts: DateTime.tryParse(map['ts'] as String? ?? '') ?? DateTime.now(),
+      stress: map['stress_1_5'] as int? ?? 3,
+      note: map['note'] as String?,
+    );
+  }
+}
+
 class BolusLogEntry {
   BolusLogEntry({
     required this.timestamp,
@@ -14,6 +120,9 @@ class BolusLogEntry {
     required this.totalBolus,
     this.notes,
     String? id,
+    this.exerciseLog,
+    this.sleepLog,
+    this.moodLog,
   }) : id = id ?? '${timestamp.microsecondsSinceEpoch}';
 
   final DateTime timestamp;
@@ -27,6 +136,11 @@ class BolusLogEntry {
   final String? notes;
   final String id;
 
+  // Canonical log structures
+  final ExerciseLog? exerciseLog;
+  final SleepLog? sleepLog;
+  final MoodLog? moodLog;
+
   Map<String, dynamic> toMap() => {
         'id': id,
         'timestamp': timestamp.toIso8601String(),
@@ -38,6 +152,10 @@ class BolusLogEntry {
         'trendAdjustment': trendAdjustment,
         'totalBolus': totalBolus,
         'notes': notes,
+        // Canonical log structures
+        if (exerciseLog != null) 'exerciseLog': exerciseLog!.toMap(),
+        if (sleepLog != null) 'sleepLog': sleepLog!.toMap(),
+        if (moodLog != null) 'moodLog': moodLog!.toMap(),
       };
 
   String toJson() => jsonEncode(toMap());
@@ -55,8 +173,45 @@ class BolusLogEntry {
       return null;
     }
 
+    ExerciseLog? parseExerciseLog(dynamic value) {
+      if (value == null) return null;
+      if (value is Map<String, dynamic>) {
+        try {
+          return ExerciseLog.fromMap(value);
+        } catch (_) {
+          return null;
+        }
+      }
+      return null;
+    }
+
+    SleepLog? parseSleepLog(dynamic value) {
+      if (value == null) return null;
+      if (value is Map<String, dynamic>) {
+        try {
+          return SleepLog.fromMap(value);
+        } catch (_) {
+          return null;
+        }
+      }
+      return null;
+    }
+
+    MoodLog? parseMoodLog(dynamic value) {
+      if (value == null) return null;
+      if (value is Map<String, dynamic>) {
+        try {
+          return MoodLog.fromMap(value);
+        } catch (_) {
+          return null;
+        }
+      }
+      return null;
+    }
+
     return BolusLogEntry(
-      timestamp: DateTime.tryParse(map['timestamp'] as String? ?? '') ?? DateTime.now(),
+      timestamp: DateTime.tryParse(map['timestamp'] as String? ?? '') ??
+          DateTime.now(),
       glucose: castDouble(map['glucose']),
       glucoseUnit: map['glucoseUnit'] as String? ?? 'mg/dL',
       carbs: castDouble(map['carbs']),
@@ -65,7 +220,12 @@ class BolusLogEntry {
       trendAdjustment: castDouble(map['trendAdjustment']) ?? 0,
       totalBolus: castDouble(map['totalBolus']) ?? 0,
       notes: map['notes'] as String?,
-      id: map['id'] as String? ?? (map['timestamp'] as String? ?? '${DateTime.now().microsecondsSinceEpoch}'),
+      id: map['id'] as String? ??
+          (map['timestamp'] as String? ??
+              '${DateTime.now().microsecondsSinceEpoch}'),
+      exerciseLog: parseExerciseLog(map['exerciseLog']),
+      sleepLog: parseSleepLog(map['sleepLog']),
+      moodLog: parseMoodLog(map['moodLog']),
     );
   }
 }

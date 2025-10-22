@@ -28,6 +28,20 @@ class _AddExerciseModalState extends State<AddExerciseModal> {
     'Vigorous',
   ];
 
+  // Map display names to canonical intensity values
+  String _getCanonicalIntensity(String displayIntensity) {
+    switch (displayIntensity) {
+      case 'Light':
+        return 'low';
+      case 'Moderate':
+        return 'mod';
+      case 'Vigorous':
+        return 'vig';
+      default:
+        return 'mod';
+    }
+  }
+
   @override
   void dispose() {
     _durationController.dispose();
@@ -119,6 +133,16 @@ class _AddExerciseModalState extends State<AddExerciseModal> {
       if (_notes.trim().isNotEmpty) _notes.trim(),
     ].join('\n');
 
+    // Create canonical exercise log structure
+    final exerciseLog = ExerciseLog(
+      ts: _selectedDateTime,
+      type: activity.isNotEmpty ? activity : 'Activity',
+      durationMin: durationValue,
+      intensity: _getCanonicalIntensity(_intensity),
+      rpe: null, // Could add RPE picker in future
+      note: _notes.trim().isNotEmpty ? _notes.trim() : null,
+    );
+
     final entry = BolusLogEntry(
       timestamp: _selectedDateTime,
       glucose: null,
@@ -129,6 +153,7 @@ class _AddExerciseModalState extends State<AddExerciseModal> {
       trendAdjustment: 0,
       totalBolus: 0,
       notes: fullNotes,
+      exerciseLog: exerciseLog, // Canonical structure
     );
 
     await BolusLogService.addEntry(entry);

@@ -456,6 +456,52 @@ class _BolusPageState extends State<BolusPage> {
     return const [];
   }
 
+  Widget _buildTrendArrow(String arrow) {
+    // Map arrows to Material Icons to avoid emoji rendering on Android
+    IconData? icon;
+    switch (arrow) {
+      case '↑↑':
+        icon = Icons.keyboard_double_arrow_up;
+        break;
+      case '↑':
+        icon = Icons.arrow_upward;
+        break;
+      case '↗':
+        icon = Icons.north_east;
+        break;
+      case '→':
+        icon = Icons.arrow_forward;
+        break;
+      case '↘':
+        icon = Icons.south_east;
+        break;
+      case '↓':
+        icon = Icons.arrow_downward;
+        break;
+      case '↓↓':
+        icon = Icons.keyboard_double_arrow_down;
+        break;
+    }
+
+    if (icon != null) {
+      return Icon(
+        icon,
+        size: 20,
+        color: Colors.black,
+      );
+    }
+
+    // Fallback to text if no icon match
+    return Text(
+      arrow,
+      style: const TextStyle(
+        fontSize: 18,
+        color: Colors.black,
+        fontWeight: FontWeight.normal,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading) {
@@ -533,11 +579,21 @@ class _BolusPageState extends State<BolusPage> {
                   runSpacing: 4,
                   children: _trendChoices.map((t) {
                     final selected = _selectedTrend == t;
-                    return ChoiceChip(
-                      label: Text(t, style: const TextStyle(fontSize: 16)),
-                      selected: selected,
-                      onSelected: (v) =>
-                          setState(() => _selectedTrend = v ? t : null),
+                    return InkWell(
+                      onTap: () => setState(() => _selectedTrend = selected ? null : t),
+                      borderRadius: BorderRadius.circular(8),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: selected ? Theme.of(context).colorScheme.primaryContainer : Colors.transparent,
+                          border: Border.all(
+                            color: selected ? Theme.of(context).colorScheme.primary : Colors.grey.shade400,
+                            width: 1,
+                          ),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: _buildTrendArrow(t),
+                      ),
                     );
                   }).toList(),
                 ),
