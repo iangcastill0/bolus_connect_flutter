@@ -5,12 +5,17 @@ import 'package:shared_preferences/shared_preferences.dart';
 class HealthQuestionnaireService {
   HealthQuestionnaireService._();
 
+  // Stored per-user baseline intake data. Kept at the same storage key to allow
+  // overwriting legacy questionnaire data with the new baseline format.
   static const _storageKey = 'health_questionnaire_answers_by_user_v1';
 
-  /// Returns true once the questionnaire has stored answers for [userId].
+  /// Returns true once the baseline intake has been locked for [userId].
   static Future<bool> isCompletedForUser(String userId) async {
-    final all = await _loadAll();
-    return all[userId] is Map;
+    final answers = await loadAnswersForUser(userId);
+    if (answers == null) return false;
+    final lockedAt = answers['lockedAt'];
+    final immutable = answers['immutable'] == true;
+    return lockedAt != null || immutable;
   }
 
   /// Persists answers for the signed-in [userId].

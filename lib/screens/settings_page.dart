@@ -100,6 +100,7 @@ class SettingsPageState extends State<SettingsPage> {
     );
     if (!context.mounted) return;
 
+    // Health profile is always editable
     final result = await showHealthQuestionnaireDialog(
       context,
       initialAnswers: existing,

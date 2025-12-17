@@ -28,6 +28,8 @@ class _HomePageState extends State<HomePage> {
   bool _loading = true;
   String? _healthTip;
   final TipBankService _tipBankService = TipBankService();
+  // Toggle this to true for local testing to fetch a fresh tip on every refresh.
+  static const bool _forceTipsForTesting = false;
 
   @override
   void initState() {
@@ -57,12 +59,12 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _loadHealthTip() async {
-    final tip = await _tipBankService.getTipOfTheDay();
-    if (mounted) {
-      setState(() {
-        _healthTip = tip;
-      });
-    }
+    final tip =
+        await _tipBankService.getTipOfTheDay(force: _forceTipsForTesting);
+    if (!mounted) return;
+    setState(() {
+      _healthTip = tip;
+    });
   }
 
   Future<void> _loadData() async {
@@ -89,8 +91,8 @@ class _HomePageState extends State<HomePage> {
     await _loadData();
   }
 
-  void _showQuickAddMenu(BuildContext context) {
-    showMenu(
+  Future<void> _showQuickAddMenu(BuildContext context) async {
+    final selection = await showMenu<String>(
       context: context,
       position: RelativeRect.fromLTRB(
         MediaQuery.of(context).size.width - 50,
@@ -130,11 +132,11 @@ class _HomePageState extends State<HomePage> {
           ),
         ),
       ],
-    ).then((value) {
-      if (value != null) {
-        _handleQuickAddSelection(context, value);
-      }
-    });
+    );
+    if (!mounted) return;
+    if (selection == null) return;
+    // ignore: use_build_context_synchronously
+    _handleQuickAddSelection(context, selection);
   }
 
   void _handleQuickAddSelection(BuildContext context, String selection) {

@@ -1,38 +1,11 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
-import '../widgets/keyboard_dismissible.dart';
 import '../services/health_questionnaire_service.dart';
-
-// Helper function to create consistent page transitions for health questionnaire
-PageRouteBuilder<T> _buildHealthQuestionnaireRoute<T>({
-  required Widget page,
-  bool fullscreenDialog = false,
-}) {
-  return PageRouteBuilder<T>(
-    pageBuilder: (context, animation, secondaryAnimation) => page,
-    fullscreenDialog: fullscreenDialog,
-    transitionsBuilder: (context, animation, secondaryAnimation, child) {
-      const begin = Offset(1.0, 0.0);
-      const end = Offset.zero;
-      const curve = Curves.easeInOut;
-
-      var tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
-      var offsetAnimation = animation.drive(tween);
-
-      return SlideTransition(
-        position: offsetAnimation,
-        child: child,
-      );
-    },
-    transitionDuration: const Duration(milliseconds: 300),
-  );
-}
+import '../widgets/keyboard_dismissible.dart';
 
 Future<HealthQuestionnaireResult?> showHealthQuestionnaireDialog(
   BuildContext context, {
@@ -40,5538 +13,2839 @@ Future<HealthQuestionnaireResult?> showHealthQuestionnaireDialog(
   bool allowCancel = true,
 }) {
   return Navigator.of(context).push<HealthQuestionnaireResult>(
-    _buildHealthQuestionnaireRoute(
-      page: _HealthQuestionnaireFlow(
+    MaterialPageRoute(
+      fullscreenDialog: true,
+      builder: (_) => _BaselineIntakeFlow(
         initialAnswers: initialAnswers,
         allowCancel: allowCancel,
       ),
-      fullscreenDialog: true,
     ),
   );
 }
 
 class HealthQuestionnaireResult {
   HealthQuestionnaireResult({
-    required this.fullName,
-    required this.dateOfBirth,
-    required this.gender,
-    required this.heightCm,
-    required this.weightKg,
-    required this.countryCode,
-    required this.glucoseUnit,
-    required this.conditions,
-    this.bmi,
-    required this.baselineLifestyle,
-    required this.baselineActivity,
-    required this.baselineStress,
-    required this.baselineSleep,
-    required this.baselineNutrition,
-    required this.baselinePsych,
-    required this.completedAt,
-    required this.updatedAt,
-    this.lastSyncedAt,
     required this.answers,
+    required this.baselineVersion,
+    required this.completedAt,
+    this.lockedAt,
   });
 
-  final String fullName;
-  final DateTime dateOfBirth;
-  final String gender;
-  final double heightCm;
-  final double weightKg;
-  final String countryCode;
-  final String glucoseUnit;
-  final List<String> conditions;
-  final double? bmi;
-  final Map<String, dynamic> baselineLifestyle;
-  final Map<String, dynamic> baselineActivity;
-  final Map<String, dynamic> baselineStress;
-  final Map<String, dynamic> baselineSleep;
-  final Map<String, dynamic> baselineNutrition;
-  final Map<String, dynamic> baselinePsych;
-  final DateTime completedAt;
-  final DateTime updatedAt;
-  final DateTime? lastSyncedAt;
   final Map<String, dynamic> answers;
+  final String baselineVersion;
+  final DateTime completedAt;
+  final DateTime? lockedAt;
+
+  Map<String, dynamic> get baseline =>
+      Map<String, dynamic>.from(answers['baseline'] as Map? ?? {});
 }
 
-class _LabeledOption {
-  const _LabeledOption(this.value, this.label);
-
-  final String value;
+class _ConditionOption {
+  const _ConditionOption({required this.label, required this.code});
   final String label;
+  final String code;
 }
 
-class _CategoryOption {
-  const _CategoryOption(this.value, this.label, this.description);
+class _SelectedCondition {
+  _SelectedCondition({
+    required this.label,
+    required this.code,
+    this.isCurrent = true,
+    this.diagnosedYear,
+  });
 
-  final String value;
+  final String label;
+  final String code;
+  bool isCurrent;
+  String? diagnosedYear;
+}
+
+class _MedicationOption {
+  const _MedicationOption({required this.label, required this.code});
+  final String label;
+  final String code;
+}
+
+class _ActivityCategory {
+  const _ActivityCategory({
+    required this.key,
+    required this.label,
+    required this.description,
+  });
+  final String key;
   final String label;
   final String description;
 }
 
-class _QuestionnaireProgressIndicator extends StatelessWidget
-    implements PreferredSizeWidget {
-  const _QuestionnaireProgressIndicator({
-    required this.currentStep,
-    required this.totalSteps,
-    required this.sectionName,
-  });
+class _ActivityCategoryInput {
+  _ActivityCategoryInput({required this.key});
 
-  final int currentStep;
-  final int totalSteps;
-  final String sectionName;
-
-  @override
-  Size get preferredSize => const Size.fromHeight(50.0);
-
-  @override
-  Widget build(BuildContext context) {
-    final progress = currentStep / totalSteps;
-    final theme = Theme.of(context);
-
-    return Container(
-      height: 50.0,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        border: Border(
-          bottom: BorderSide(
-            color: const Color(0xFFDDDDDD),
-            width: 1.0,
-          ),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            'Step $currentStep of $totalSteps — $sectionName',
-            style: theme.textTheme.bodyMedium?.copyWith(
-              fontWeight: FontWeight.w500,
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.8),
-            ),
-          ),
-          const SizedBox(height: 8),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(2),
-            child: LinearProgressIndicator(
-              value: progress,
-              minHeight: 4,
-              backgroundColor: theme.colorScheme.surfaceContainerHighest,
-              valueColor: AlwaysStoppedAnimation<Color>(theme.colorScheme.primary),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  final String key;
+  int? daysPerWeek;
+  int? minutesPerSession;
+  String? intensity;
 }
 
-class _RegionOption {
-  const _RegionOption({
-    required this.code,
-    required this.label,
-    required this.glucoseUnit,
-  });
-
-  final String code;
-  final String label;
-  final String glucoseUnit;
-}
-
-// Canonical: profile.sex_at_birth (enum: male|female|intersex|other)
-const List<_LabeledOption> _sexOptions = [
-  _LabeledOption('female', 'Female'),
-  _LabeledOption('male', 'Male'),
-];
-
-const List<_RegionOption> _regionOptions = [
-  // North America
-  _RegionOption(code: 'US', label: 'United States', glucoseUnit: 'mg/dL'),
-  _RegionOption(code: 'CA', label: 'Canada', glucoseUnit: 'mmol/L'),
-  _RegionOption(code: 'MX', label: 'Mexico', glucoseUnit: 'mg/dL'),
-
-  // Central & South America
-  _RegionOption(code: 'AR', label: 'Argentina', glucoseUnit: 'mg/dL'),
-  _RegionOption(code: 'BR', label: 'Brazil', glucoseUnit: 'mg/dL'),
-  _RegionOption(code: 'CL', label: 'Chile', glucoseUnit: 'mg/dL'),
-  _RegionOption(code: 'CO', label: 'Colombia', glucoseUnit: 'mg/dL'),
-  _RegionOption(code: 'PE', label: 'Peru', glucoseUnit: 'mg/dL'),
-  _RegionOption(code: 'VE', label: 'Venezuela', glucoseUnit: 'mg/dL'),
-
-  // Europe
-  _RegionOption(code: 'GB', label: 'United Kingdom', glucoseUnit: 'mmol/L'),
-  _RegionOption(code: 'DE', label: 'Germany', glucoseUnit: 'mmol/L'),
-  _RegionOption(code: 'FR', label: 'France', glucoseUnit: 'mmol/L'),
-  _RegionOption(code: 'IT', label: 'Italy', glucoseUnit: 'mmol/L'),
-  _RegionOption(code: 'ES', label: 'Spain', glucoseUnit: 'mmol/L'),
-  _RegionOption(code: 'NL', label: 'Netherlands', glucoseUnit: 'mmol/L'),
-  _RegionOption(code: 'BE', label: 'Belgium', glucoseUnit: 'mmol/L'),
-  _RegionOption(code: 'CH', label: 'Switzerland', glucoseUnit: 'mmol/L'),
-  _RegionOption(code: 'AT', label: 'Austria', glucoseUnit: 'mmol/L'),
-  _RegionOption(code: 'SE', label: 'Sweden', glucoseUnit: 'mmol/L'),
-  _RegionOption(code: 'NO', label: 'Norway', glucoseUnit: 'mmol/L'),
-  _RegionOption(code: 'DK', label: 'Denmark', glucoseUnit: 'mmol/L'),
-  _RegionOption(code: 'FI', label: 'Finland', glucoseUnit: 'mmol/L'),
-  _RegionOption(code: 'IE', label: 'Ireland', glucoseUnit: 'mmol/L'),
-  _RegionOption(code: 'PT', label: 'Portugal', glucoseUnit: 'mmol/L'),
-  _RegionOption(code: 'GR', label: 'Greece', glucoseUnit: 'mmol/L'),
-  _RegionOption(code: 'PL', label: 'Poland', glucoseUnit: 'mmol/L'),
-  _RegionOption(code: 'CZ', label: 'Czech Republic', glucoseUnit: 'mmol/L'),
-  _RegionOption(code: 'RO', label: 'Romania', glucoseUnit: 'mmol/L'),
-  _RegionOption(code: 'HU', label: 'Hungary', glucoseUnit: 'mmol/L'),
-
-  // Asia Pacific
-  _RegionOption(code: 'AU', label: 'Australia', glucoseUnit: 'mmol/L'),
-  _RegionOption(code: 'NZ', label: 'New Zealand', glucoseUnit: 'mmol/L'),
-  _RegionOption(code: 'JP', label: 'Japan', glucoseUnit: 'mg/dL'),
-  _RegionOption(code: 'CN', label: 'China', glucoseUnit: 'mmol/L'),
-  _RegionOption(code: 'IN', label: 'India', glucoseUnit: 'mg/dL'),
-  _RegionOption(code: 'KR', label: 'South Korea', glucoseUnit: 'mg/dL'),
-  _RegionOption(code: 'TW', label: 'Taiwan', glucoseUnit: 'mg/dL'),
-  _RegionOption(code: 'SG', label: 'Singapore', glucoseUnit: 'mmol/L'),
-  _RegionOption(code: 'MY', label: 'Malaysia', glucoseUnit: 'mmol/L'),
-  _RegionOption(code: 'TH', label: 'Thailand', glucoseUnit: 'mg/dL'),
-  _RegionOption(code: 'PH', label: 'Philippines', glucoseUnit: 'mg/dL'),
-  _RegionOption(code: 'ID', label: 'Indonesia', glucoseUnit: 'mg/dL'),
-  _RegionOption(code: 'VN', label: 'Vietnam', glucoseUnit: 'mmol/L'),
-  _RegionOption(code: 'PK', label: 'Pakistan', glucoseUnit: 'mg/dL'),
-  _RegionOption(code: 'BD', label: 'Bangladesh', glucoseUnit: 'mg/dL'),
-
-  // Middle East & Africa
-  _RegionOption(code: 'IL', label: 'Israel', glucoseUnit: 'mg/dL'),
-  _RegionOption(code: 'AE', label: 'United Arab Emirates', glucoseUnit: 'mmol/L'),
-  _RegionOption(code: 'SA', label: 'Saudi Arabia', glucoseUnit: 'mmol/L'),
-  _RegionOption(code: 'TR', label: 'Turkey', glucoseUnit: 'mg/dL'),
-  _RegionOption(code: 'EG', label: 'Egypt', glucoseUnit: 'mg/dL'),
-  _RegionOption(code: 'ZA', label: 'South Africa', glucoseUnit: 'mmol/L'),
-  _RegionOption(code: 'NG', label: 'Nigeria', glucoseUnit: 'mmol/L'),
-  _RegionOption(code: 'KE', label: 'Kenya', glucoseUnit: 'mmol/L'),
-
-  // Other
-  _RegionOption(code: 'OTHER', label: 'Other', glucoseUnit: 'mg/dL'),
-];
-
-// Canonical: profile.diabetes_type (enum: T1D|T2D|Prediabetes|Monitoring)
-const List<_LabeledOption> _diabetesTypeOptions = [
-  _LabeledOption('T1D', 'Type 1 Diabetes'),
-  _LabeledOption('T2D', 'Type 2 Diabetes'),
-  _LabeledOption('Prediabetes', 'Prediabetes'),
-  _LabeledOption('Monitoring', 'Monitoring only'),
-];
-
-// Canonical: profile.therapy (enum: MDI|Pump|NonInsulin|DietExercise|None)
-const List<_LabeledOption> _treatmentOptions = [
-  _LabeledOption('MDI', 'Multiple daily injections (MDI)'),
-  _LabeledOption('Pump', 'Insulin pump'),
-  _LabeledOption('NonInsulin', 'Non-insulin medication'),
-  _LabeledOption('DietExercise', 'Diet & exercise'),
-  _LabeledOption('None', 'None'),
-];
-
-// Canonical: profile.comorbidities[] - organized by semantic categories
-// ICD-10 codes included as comments for clinical reference
-const Map<String, List<_LabeledOption>> _conditionsByCategory = {
-  'cardiometabolic': [
-    // I13
-    _LabeledOption('combined_htn_heart_kidney', 'Combined heart + kidney disease'),
-    // E78.5
-    _LabeledOption('dyslipidemia', 'Dyslipidemia'),
-    // E78.0
-    _LabeledOption('hypercholesterolemia', 'Hypercholesterolemia'),
-    // I10
-    _LabeledOption('hypertension', 'Hypertension'),
-    // I12
-    _LabeledOption('htn_ckd', 'Hypertensive chronic kidney disease'),
-    // I11
-    _LabeledOption('htn_heart', 'Hypertensive heart disease'),
-    // E78.1
-    _LabeledOption('hypertriglyceridemia', 'Hypertriglyceridemia'),
-    // E88.81
-    _LabeledOption('insulin_resistance', 'Insulin resistance'),
-    // E78.6
-    _LabeledOption('low_hdl', 'Low HDL'),
-    // E88.81
-    _LabeledOption('metabolic_syndrome', 'Metabolic syndrome'),
-    // K75.81
-    _LabeledOption('nash', 'Non-alcoholic steatohepatitis (NASH)'),
-    // K76.0
-    _LabeledOption('nafld', 'Non-alcoholic fatty liver disease (NAFLD)'),
-    // E66.9
-    _LabeledOption('obesity', 'Obesity'),
-    // R73.01 / R73.03
-    _LabeledOption('prediabetes', 'Prediabetes / Impaired fasting glucose'),
-    // E66.01 / E66.02
-    _LabeledOption('severe_obesity', 'Severe obesity (BMI ≥35)'),
-    // E11
-    _LabeledOption('type2_diabetes', 'Type 2 Diabetes'),
-  ],
-  'endocrine': [
-    // E06.3
-    _LabeledOption('hashimoto', 'Hashimoto\'s thyroiditis'),
-    // E05.90
-    _LabeledOption('hyperthyroidism', 'Hyperthyroidism'),
-    // E03.9
-    _LabeledOption('hypothyroidism', 'Hypothyroidism'),
-    // E28.2
-    _LabeledOption('pcos', 'Polycystic Ovary Syndrome (PCOS)'),
-    // E29.1
-    _LabeledOption('testosterone_deficiency', 'Testosterone deficiency'),
-    // E10
-    _LabeledOption('type1_diabetes', 'Type 1 Diabetes'),
-    // E55.9
-    _LabeledOption('vitamin_d_deficiency', 'Vitamin D deficiency'),
-  ],
-  'cardiovascular': [
-    // I20.9
-    _LabeledOption('angina', 'Angina pectoris'),
-    // I25.10
-    _LabeledOption('cad', 'Coronary artery disease (CAD)'),
-    // I50.9 / I50.2
-    _LabeledOption('heart_failure', 'Heart failure'),
-    // I25.2
-    _LabeledOption('mi_history', 'History of myocardial infarction'),
-    // I73.9
-    _LabeledOption('pad', 'Peripheral arterial disease (PAD)'),
-  ],
-  'renal': [
-    // N18.1–N18.5
-    _LabeledOption('ckd', 'Chronic kidney disease (CKD)'),
-    // E11.21
-    _LabeledOption('diabetic_nephropathy', 'Diabetic nephropathy'),
-    // N18.6
-    _LabeledOption('esrd', 'End-stage renal disease'),
-  ],
-  'respiratory_sleep': [
-    // F51.04
-    _LabeledOption('insomnia', 'Insomnia (chronic)'),
-    // G47.33
-    _LabeledOption('osa', 'Obstructive Sleep Apnea (OSA)'),
-    // G47.30
-    _LabeledOption('sleep_breathing', 'Sleep-related breathing disorders'),
-  ],
-  'gi_metabolic': [
-    // K21.9
-    _LabeledOption('gerd', 'GERD'),
-    // K58.9
-    _LabeledOption('ibs', 'Irritable bowel syndrome'),
-  ],
-  'autoimmune': [
-    // L40.50
-    _LabeledOption('psoriatic_arthritis', 'Psoriatic arthritis'),
-    // L40.0
-    _LabeledOption('psoriasis', 'Psoriasis'),
-    // M06.9
-    _LabeledOption('rheumatoid_arthritis', 'Rheumatoid arthritis'),
-  ],
-  'mental_health': [
-    // F33.9
-    _LabeledOption('depression', 'Depression'),
-    // F41.1
-    _LabeledOption('anxiety', 'Generalized anxiety disorder'),
-  ],
-  'other': [
-    // D64.9
-    _LabeledOption('anemia', 'Anemia'),
-    // M10.9 / E79.0
-    _LabeledOption('gout', 'Gout / Hyperuricemia'),
-    // G43.909
-    _LabeledOption('migraine', 'Migraine'),
-    _LabeledOption('other_condition', 'Other'),
-  ],
-};
-
-const List<_CategoryOption> _conditionCategories = [
-  _CategoryOption('cardiometabolic', 'Cardiometabolic Disorders', 'Hypertension, cholesterol, diabetes, obesity, metabolic'),
-  _CategoryOption('endocrine', 'Endocrine & Hormonal', 'Thyroid, PCOS, diabetes, hormonal'),
-  _CategoryOption('cardiovascular', 'Cardiovascular', 'Heart disease, CAD, heart failure'),
-  _CategoryOption('renal', 'Renal', 'Kidney disease, CKD, nephropathy'),
-  _CategoryOption('respiratory_sleep', 'Respiratory & Sleep', 'Sleep apnea, insomnia'),
-  _CategoryOption('gi_metabolic', 'GI / Metabolic', 'GERD, IBS'),
-  _CategoryOption('autoimmune', 'Inflammatory & Autoimmune', 'Arthritis, psoriasis'),
-  _CategoryOption('mental_health', 'Mental Health', 'Depression, anxiety'),
-  _CategoryOption('other', 'Other', 'Gout, migraine, anemia'),
-  _CategoryOption('none', 'No diagnoses', 'No known conditions'),
-];
-
-// Canonical: profile.meds[] (set: metformin|glp1|sglt2|basal_ins|bolus_ins|other)
-const List<_LabeledOption> _medicationOptions = [
-  _LabeledOption('metformin', 'Metformin'),
-  _LabeledOption('glp1', 'GLP-1 receptor agonist'),
-  _LabeledOption('sglt2', 'SGLT2 inhibitor'),
-  _LabeledOption('basal_ins', 'Basal insulin'),
-  _LabeledOption('bolus_ins', 'Bolus insulin'),
-  _LabeledOption('other', 'Other'),
-  _LabeledOption('none', 'None'),
-];
-
-// Canonical: lifestyle.work_pattern (enum: daytime|shift|irregular|student|retired)
-const List<_LabeledOption> _workPatternOptions = [
-  _LabeledOption('daytime', 'Daytime'),
-  _LabeledOption('shift', 'Shift work'),
-  _LabeledOption('irregular', 'Irregular'),
-  _LabeledOption('student', 'Student'),
-  _LabeledOption('retired', 'Retired'),
-];
-
-// Canonical: lifestyle.breakfast_habit (enum: daily|sometimes|never)
-const List<_LabeledOption> _breakfastHabitOptions = [
-  _LabeledOption('daily', 'Every day'),
-  _LabeledOption('sometimes', 'Sometimes'),
-  _LabeledOption('never', 'Never'),
-];
-
-// Canonical: lifestyle.caffeine_per_day (enum: none|1_2|3_5|gt5)
-const List<_LabeledOption> _caffeineOptions = [
-  _LabeledOption('none', 'None'),
-  _LabeledOption('1_2', '1–2 cups'),
-  _LabeledOption('3_5', '3–5 cups'),
-  _LabeledOption('gt5', 'More than 5 cups'),
-];
-
-// Canonical: lifestyle.alcohol_freq (enum: never|occasional|several_per_week|daily)
-const List<_LabeledOption> _alcoholOptions = [
-  _LabeledOption('never', 'Never'),
-  _LabeledOption('occasional', 'Occasionally'),
-  _LabeledOption('several_per_week', 'Several times a week'),
-  _LabeledOption('daily', 'Daily'),
-];
-
-// Canonical: lifestyle.smoker (bool - converted from yes/no)
-const List<_LabeledOption> _smokingOptions = [
-  _LabeledOption('yes', 'Yes'),
-  _LabeledOption('no', 'No'),
-];
-
-// Canonical: lifestyle.perceived_energy (enum: low|moderate|high)
-const List<_LabeledOption> _energyLevelOptions = [
-  _LabeledOption('low', 'Low'),
-  _LabeledOption('moderate', 'Moderate'),
-  _LabeledOption('high', 'High'),
-];
-
-String _formatTimeOfDay(TimeOfDay time) {
-  final hour = time.hour.toString().padLeft(2, '0');
-  final minute = time.minute.toString().padLeft(2, '0');
-  return '$hour:$minute';
-}
-
-TimeOfDay? _parseTimeOfDay(String? value) {
-  if (value == null || value.isEmpty) return null;
-  final parts = value.split(':');
-  if (parts.length != 2) return null;
-  final hour = int.tryParse(parts[0]);
-  final minute = int.tryParse(parts[1]);
-  if (hour == null || minute == null) return null;
-  if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
-  return TimeOfDay(hour: hour, minute: minute);
-}
-
-enum _FieldId {
-  fullName,
-  dob,
-  gender,
-  height,
-  weight,
-  country,
-  conditions,
-}
-
-enum _Section { basic, measurements, management }
-
-class _StepInfo {
-  const _StepInfo(this.step, this.sectionName);
-  final int step;
-  final String sectionName;
-}
-
-const Duration _kValidationFadeDuration = Duration(milliseconds: 180);
-
-const Map<_FieldId, _Section> _fieldSection = {
-  _FieldId.fullName: _Section.basic,
-  _FieldId.dob: _Section.basic,
-  _FieldId.gender: _Section.basic,
-  _FieldId.height: _Section.measurements,
-  _FieldId.weight: _Section.measurements,
-  _FieldId.country: _Section.measurements,
-  _FieldId.conditions: _Section.management,
-};
-
-const Map<_Section, Set<_FieldId>> _sectionFields = {
-  _Section.basic: {_FieldId.fullName, _FieldId.dob, _FieldId.gender},
-  _Section.measurements: {_FieldId.height, _FieldId.weight, _FieldId.country},
-  _Section.management: {
-    _FieldId.conditions,
-  },
-};
-
-class _HealthQuestionnaireFlow extends StatefulWidget {
-  const _HealthQuestionnaireFlow({
-    this.initialAnswers,
-    this.allowCancel = true,
+class _BaselineIntakeFlow extends StatefulWidget {
+  const _BaselineIntakeFlow({
+    required this.initialAnswers,
+    required this.allowCancel,
   });
 
   final Map<String, dynamic>? initialAnswers;
   final bool allowCancel;
 
   @override
-  State<_HealthQuestionnaireFlow> createState() =>
-      _HealthQuestionnaireFlowState();
+  State<_BaselineIntakeFlow> createState() => _BaselineIntakeFlowState();
 }
 
-class _HealthQuestionnaireFlowState extends State<_HealthQuestionnaireFlow> {
-  final _formKey = GlobalKey<FormState>();
+class _BaselineIntakeFlowState extends State<_BaselineIntakeFlow> {
+  // Page definitions
+  static const _totalPages = 9;
 
-  final _fullNameFieldKey = GlobalKey<FormFieldState<String>>();
-  final _dobFieldKey = GlobalKey<FormFieldState<String>>();
-  final _heightFieldKey = GlobalKey<FormFieldState<String>>();
-  final _weightFieldKey = GlobalKey<FormFieldState<String>>();
-  final _genderFieldKey = GlobalKey<FormFieldState<String>>();
-  final _countryFieldKey = GlobalKey<FormFieldState<String>>();
-  final _diabetesTypeFieldKey = GlobalKey<FormFieldState<String>>();
-  final _treatmentFieldKey = GlobalKey<FormFieldState<String>>();
+  static const List<String> _dietPatterns = [
+    'Balanced',
+    'Mediterranean',
+    'Low carb',
+    'Plant-forward/vegetarian',
+    'High protein',
+    'Other',
+  ];
 
-  final FocusNode _fullNameFocusNode = FocusNode();
-  final FocusNode _heightFocusNode = FocusNode();
-  final FocusNode _weightFocusNode = FocusNode();
+  static const List<String> _dietRestrictionOptions = [
+    'Gluten free',
+    'Dairy free',
+    'Nut allergy',
+    'Low sodium',
+    'Halal/Kosher',
+    'None',
+  ];
 
-  final TextEditingController _nameController = TextEditingController();
+  static const List<String> _countryOptions = [
+    'Afghanistan',
+    'Albania',
+    'Algeria',
+    'Andorra',
+    'Angola',
+    'Antigua and Barbuda',
+    'Argentina',
+    'Armenia',
+    'Australia',
+    'Austria',
+    'Azerbaijan',
+    'Bahamas',
+    'Bahrain',
+    'Bangladesh',
+    'Barbados',
+    'Belarus',
+    'Belgium',
+    'Belize',
+    'Benin',
+    'Bhutan',
+    'Bolivia',
+    'Bosnia and Herzegovina',
+    'Botswana',
+    'Brazil',
+    'Brunei',
+    'Bulgaria',
+    'Burkina Faso',
+    'Burundi',
+    'Cabo Verde',
+    'Cambodia',
+    'Cameroon',
+    'Canada',
+    'Central African Republic',
+    'Chad',
+    'Chile',
+    'China',
+    'Colombia',
+    'Comoros',
+    'Congo (DRC)',
+    'Congo (Republic)',
+    'Costa Rica',
+    'Cote d\'Ivoire',
+    'Croatia',
+    'Cuba',
+    'Cyprus',
+    'Czech Republic',
+    'Denmark',
+    'Djibouti',
+    'Dominica',
+    'Dominican Republic',
+    'Ecuador',
+    'Egypt',
+    'El Salvador',
+    'Equatorial Guinea',
+    'Eritrea',
+    'Estonia',
+    'Eswatini',
+    'Ethiopia',
+    'Fiji',
+    'Finland',
+    'France',
+    'Gabon',
+    'Gambia',
+    'Georgia',
+    'Germany',
+    'Ghana',
+    'Greece',
+    'Grenada',
+    'Guatemala',
+    'Guinea',
+    'Guinea-Bissau',
+    'Guyana',
+    'Haiti',
+    'Honduras',
+    'Hungary',
+    'Iceland',
+    'India',
+    'Indonesia',
+    'Iran',
+    'Iraq',
+    'Ireland',
+    'Israel',
+    'Italy',
+    'Jamaica',
+    'Japan',
+    'Jordan',
+    'Kazakhstan',
+    'Kenya',
+    'Kiribati',
+    'Kuwait',
+    'Kyrgyzstan',
+    'Laos',
+    'Latvia',
+    'Lebanon',
+    'Lesotho',
+    'Liberia',
+    'Libya',
+    'Liechtenstein',
+    'Lithuania',
+    'Luxembourg',
+    'Madagascar',
+    'Malawi',
+    'Malaysia',
+    'Maldives',
+    'Mali',
+    'Malta',
+    'Marshall Islands',
+    'Mauritania',
+    'Mauritius',
+    'Mexico',
+    'Micronesia',
+    'Moldova',
+    'Monaco',
+    'Mongolia',
+    'Montenegro',
+    'Morocco',
+    'Mozambique',
+    'Myanmar (Burma)',
+    'Namibia',
+    'Nauru',
+    'Nepal',
+    'Netherlands',
+    'New Zealand',
+    'Nicaragua',
+    'Niger',
+    'Nigeria',
+    'North Korea',
+    'North Macedonia',
+    'Norway',
+    'Oman',
+    'Pakistan',
+    'Palau',
+    'Panama',
+    'Papua New Guinea',
+    'Paraguay',
+    'Peru',
+    'Philippines',
+    'Poland',
+    'Portugal',
+    'Qatar',
+    'Romania',
+    'Russia',
+    'Rwanda',
+    'Saint Kitts and Nevis',
+    'Saint Lucia',
+    'Saint Vincent and the Grenadines',
+    'Samoa',
+    'San Marino',
+    'Sao Tome and Principe',
+    'Saudi Arabia',
+    'Senegal',
+    'Serbia',
+    'Seychelles',
+    'Sierra Leone',
+    'Singapore',
+    'Slovakia',
+    'Slovenia',
+    'Solomon Islands',
+    'Somalia',
+    'South Africa',
+    'South Korea',
+    'South Sudan',
+    'Spain',
+    'Sri Lanka',
+    'Sudan',
+    'Suriname',
+    'Sweden',
+    'Switzerland',
+    'Syria',
+    'Taiwan',
+    'Tajikistan',
+    'Tanzania',
+    'Thailand',
+    'Timor-Leste',
+    'Togo',
+    'Tonga',
+    'Trinidad and Tobago',
+    'Tunisia',
+    'Turkey',
+    'Turkmenistan',
+    'Tuvalu',
+    'Uganda',
+    'Ukraine',
+    'United Arab Emirates',
+    'United Kingdom',
+    'United States',
+    'Uruguay',
+    'Uzbekistan',
+    'Vanuatu',
+    'Vatican City',
+    'Venezuela',
+    'Vietnam',
+    'Yemen',
+    'Zambia',
+    'Zimbabwe',
+    'Other',
+  ];
+
+  static const List<String> _activityLimitationsOptions = [
+    'Joint pain',
+    'Cardio limitations',
+    'Recent surgery',
+    'Balance issues',
+    'Time constraints',
+    'None',
+  ];
+
+  static const List<String> _cardioRiskOptions = [];
+
+  // Condition catalog definitions (label + clinical code)
+  static const Map<String, List<_ConditionOption>> _conditionCatalog = {
+    'Cardiometabolic Disorders': [
+      _ConditionOption(label: 'Hypertension (essential)', code: 'I10'),
+      _ConditionOption(label: 'Hypertensive heart disease', code: 'I11'),
+      _ConditionOption(label: 'Hypertensive chronic kidney disease', code: 'I12'),
+      _ConditionOption(label: 'Combined heart + kidney disease (hypertensive)', code: 'I13'),
+      _ConditionOption(label: 'Dyslipidemia (unspecified / mixed)', code: 'E78.5'),
+      _ConditionOption(label: 'Hypercholesterolemia (high LDL)', code: 'E78.0'),
+      _ConditionOption(label: 'Hypertriglyceridemia', code: 'E78.1'),
+      _ConditionOption(label: 'Low HDL (hypoalphalipoproteinemia)', code: 'E78.6'),
+      _ConditionOption(label: 'Type 1 Diabetes Mellitus', code: 'E10'),
+      _ConditionOption(label: 'Type 2 Diabetes Mellitus', code: 'E11'),
+      _ConditionOption(label: 'Prediabetes / Impaired fasting glucose', code: 'R73.01/R73.03'),
+      _ConditionOption(label: 'Insulin resistance', code: 'E88.81'),
+      _ConditionOption(label: 'Obesity (general)', code: 'E66.9'),
+      _ConditionOption(label: 'Severe obesity (BMI ≥35–40)', code: 'E66.01/E66.02'),
+      _ConditionOption(label: 'Metabolic syndrome', code: 'E88.81'),
+      _ConditionOption(label: 'Non-alcoholic fatty liver disease (NAFLD / MASLD)', code: 'K76.0'),
+      _ConditionOption(label: 'Non-alcoholic steatohepatitis (NASH / MASH)', code: 'K75.81'),
+    ],
+    'Endocrine & Hormonal Disorders': [
+      _ConditionOption(label: 'Hypothyroidism (acquired)', code: 'E03.9'),
+      _ConditionOption(label: 'Hashimoto’s thyroiditis', code: 'E06.3'),
+      _ConditionOption(label: 'Hyperthyroidism', code: 'E05.90'),
+      _ConditionOption(label: 'Polycystic Ovary Syndrome (PCOS)', code: 'E28.2'),
+      _ConditionOption(label: 'Vitamin D deficiency', code: 'E55.9'),
+      _ConditionOption(label: 'Testosterone deficiency (male hypogonadism)', code: 'E29.1'),
+    ],
+    'Respiratory & Sleep Disorders': [
+      _ConditionOption(label: 'Obstructive Sleep Apnea (OSA)', code: 'G47.33'),
+      _ConditionOption(label: 'Insomnia (chronic)', code: 'F51.04'),
+      _ConditionOption(label: 'Sleep-related breathing disorders (other)', code: 'G47.30'),
+    ],
+    'Cardiovascular Diseases': [
+      _ConditionOption(label: 'Coronary artery disease (CAD)', code: 'I25.10'),
+      _ConditionOption(label: 'History of myocardial infarction', code: 'I25.2'),
+      _ConditionOption(label: 'Angina pectoris', code: 'I20.9'),
+      _ConditionOption(label: 'Heart failure (unspecified or reduced EF)', code: 'I50.9/I50.2'),
+      _ConditionOption(label: 'Peripheral arterial disease (PAD)', code: 'I73.9'),
+    ],
+    'Renal Disorders': [
+      _ConditionOption(label: 'Chronic kidney disease (CKD), stage 1–5', code: 'N18.1-N18.5'),
+      _ConditionOption(label: 'End-stage renal disease', code: 'N18.6'),
+      _ConditionOption(label: 'Diabetic nephropathy', code: 'E11.21'),
+    ],
+    'Gastrointestinal / Metabolic': [
+      _ConditionOption(label: 'GERD (gastroesophageal reflux)', code: 'K21.9'),
+      _ConditionOption(label: 'Irritable bowel syndrome', code: 'K58.9'),
+    ],
+    'Inflammatory & Autoimmune': [
+      _ConditionOption(label: 'Rheumatoid arthritis', code: 'M06.9'),
+      _ConditionOption(label: 'Psoriatic arthritis', code: 'L40.50'),
+      _ConditionOption(label: 'Psoriasis (skin)', code: 'L40.0'),
+    ],
+    'Mental Health': [
+      _ConditionOption(label: 'Depression (major depressive disorder)', code: 'F33.9'),
+      _ConditionOption(label: 'Generalized anxiety disorder', code: 'F41.1'),
+    ],
+    'Other Common Related Conditions': [
+      _ConditionOption(label: 'Gout / Hyperuricemia', code: 'M10.9'),
+      _ConditionOption(label: 'Migraine', code: 'G43.909'),
+      _ConditionOption(label: 'Anemia (unspecified)', code: 'D64.9'),
+      _ConditionOption(label: 'None of the above', code: 'NONE'),
+    ],
+  };
+
+  // Medication catalog (sample, searchable)
+  static const List<_MedicationOption> _medicationCatalog = [
+    _MedicationOption(label: 'Metformin', code: '860975'),
+    _MedicationOption(label: 'Lisinopril', code: '29046'),
+    _MedicationOption(label: 'Atorvastatin', code: '617314'),
+    _MedicationOption(label: 'Levothyroxine', code: '966286'),
+    _MedicationOption(label: 'Insulin glargine', code: '847207'),
+    _MedicationOption(label: 'Insulin aspart', code: '847207-ASP'),
+    _MedicationOption(label: 'Semaglutide', code: '1991301'),
+    _MedicationOption(label: 'Losartan', code: '617320'),
+    _MedicationOption(label: 'Sertraline', code: '36567'),
+    _MedicationOption(label: 'Albuterol inhaler', code: '435'),
+  ];
+
+  static const Map<String, List<String>> _conditionMedicationShortcuts = {
+    'I10': ['Lisinopril', 'Losartan'],
+    'E11': ['Metformin', 'Semaglutide', 'Insulin glargine'],
+    'E10': ['Insulin glargine', 'Insulin aspart'],
+    'E78.5': ['Atorvastatin'],
+    'E03.9': ['Levothyroxine'],
+    'J45.909': ['Albuterol inhaler'],
+    'I25.10': ['Atorvastatin', 'Lisinopril'],
+  };
+
+  // Controllers and state
+  int _pageIndex = 0;
+  bool _saving = false;
+  String? _baselineVersion;
+  Map<String, dynamic>? _initialAnswers;
+
+  final _demographicsFormKey = GlobalKey<FormState>();
+  final _nutritionFormKey = GlobalKey<FormState>();
+  final _activityFormKey = GlobalKey<FormState>();
+  final _mentalFormKey = GlobalKey<FormState>();
+  final _riskFormKey = GlobalKey<FormState>();
+
+  final TextEditingController _ageController = TextEditingController();
   final TextEditingController _dobController = TextEditingController();
-  final TextEditingController _heightController = TextEditingController();
-  final TextEditingController _weightController = TextEditingController();
+  final TextEditingController _otherDietController = TextEditingController();
+  final TextEditingController _sleepHoursController = TextEditingController();
+  final TextEditingController _smokingDetailsController =
+      TextEditingController();
+  final TextEditingController _fullNameController = TextEditingController();
+  final TextEditingController _conditionSearchController =
+      TextEditingController();
+  final TextEditingController _medicationSearchController =
+      TextEditingController();
 
-  DateTime? _dob;
-  String? _gender;
-  String _heightUnit = 'cm';
-  String _weightUnit = 'kg';
-  String? _countryCode;
-  String _glucoseUnit = 'mg/dL';
-  String? _diabetesType;
-  String? _treatment;
-  final Set<String> _conditions = <String>{};
-  final List<Map<String, dynamic>> _medications = []; // List of {name, dose, frequency, indication}
-  double? _bmi;
-  bool _showSelectionErrors = false;
-  int _currentProfileSection = 0; // 0 or 1 for the two sections
+  DateTime? _dateOfBirth;
+  String? _sex;
+  String? _country;
+  bool _useMetric = true; // true = cm/kg, false = in/lb
+  double _heightValue = 170;
+  double _weightValue = 70;
 
-  // New state for search-first collapsible UI
-  final TextEditingController _conditionSearchController = TextEditingController();
-  String? _expandedConditionGroup; // Only one group expanded at a time
-  int _conditionSubPage = 0; // 0=conditions, 1=medications, 2=review
+  final List<_SelectedCondition> _selectedConditions = [];
+  bool _takesPrescriptions = false;
+  bool _takesSupplements = false;
+  final List<Map<String, String>> _medications = [];
+  final List<Map<String, String>> _supplements = [];
+  final Map<String, _ActivityCategoryInput> _categoryInputs = {
+    'walking': _ActivityCategoryInput(key: 'walking'),
+    'cardio': _ActivityCategoryInput(key: 'cardio'),
+    'strength': _ActivityCategoryInput(key: 'strength'),
+    'sports': _ActivityCategoryInput(key: 'sports'),
+    'mobility': _ActivityCategoryInput(key: 'mobility'),
+  };
+  String? _stepRange;
+  String? _jobActivity;
+  Set<String> _equipmentAccess = <String>{};
+  String? _trainingHistory;
+  static const List<String> _equipmentOptions = [
+    'Gym access',
+    'Dumbbells / kettlebells',
+    'Resistance bands',
+    'Cardio machine',
+    'None',
+  ];
 
-  // Unified page management: 0=Basic Info, 1=Conditions, 2=Lifestyle, 3=Activity, 4=Psych, 5=Nutrition, 6=Stress/Sleep
-  int _currentPage = 0;
-
-  // Lifestyle page state
-  final TextEditingController _sleepDurationController = TextEditingController();
+  // Typical day / routine
   TimeOfDay? _wakeUpTime;
-  TimeOfDay? _bedtime;
+  TimeOfDay? _bedTime;
   TimeOfDay? _dinnerTime;
-  int? _sleepQuality;
-  String? _workPattern;
+  String? _typicalSleepQuality;
+  String? _workShift;
   String? _breakfastHabit;
   int? _mealsPerDay;
-  String? _caffeineIntake;
-  String? _alcoholConsumption;
+
+  double? _sleepHours;
+  String? _sleepQuality;
+  Set<String> _sleepDisturbances = <String>{};
+  Set<String> _sleepDisorders = <String>{};
+
+  String? _dietPattern;
+  Set<String> _dietRestrictionSelections = <String>{};
+  String? _alcoholUse;
+  String? _caffeineUse;
+
+  int? _activityFrequency;
+  String? _activityIntensity;
+  Set<String> _activityLimitations = <String>{};
+
+  String? _stressLevel;
+  String? _mood;
+  bool _focusIssues = false;
+  bool _burnout = false;
+
   String? _smokingStatus;
-  String? _energyLevel;
+  String? _substanceUse;
+  Set<String> _cardioRisks = <String>{};
 
-  Map<String, dynamic> _draftAnswers = <String, dynamic>{};
-  Map<String, dynamic>? _initialLifestyle;
-  Map<String, dynamic>? _initialActivity;
-  Map<String, dynamic>? _initialStress;
-  Map<String, dynamic>? _initialSleep;
-  Map<String, dynamic>? _initialNutrition;
-  Map<String, dynamic>? _initialPsych;
+  bool _consentGiven = false;
 
-  // Interaction logging - tracks every user action throughout the questionnaire
-  final List<Map<String, dynamic>> _interactionLog = [];
-
-  final Map<_FieldId, bool> _fieldValidity = {
-    for (final id in _FieldId.values) id: false,
-  };
-  final Map<_Section, bool> _sectionSaved = {
-    for (final section in _Section.values) section: false,
-  };
-  final Map<_Section, bool> _sectionSaving = {
-    for (final section in _Section.values) section: false,
-  };
+  final List<_ActivityCategory> _activityCategories = const [
+    _ActivityCategory(
+      key: 'walking',
+      label: 'Walking / general movement',
+      description: 'Everyday steps, brisk walks, errands.',
+    ),
+    _ActivityCategory(
+      key: 'cardio',
+      label: 'Cardio exercise',
+      description: 'Running, cycling, rowing, HIIT, classes.',
+    ),
+    _ActivityCategory(
+      key: 'strength',
+      label: 'Strength training',
+      description: 'Weights, machines, bodyweight sessions.',
+    ),
+    _ActivityCategory(
+      key: 'sports',
+      label: 'Sports',
+      description: 'Team or individual sports (tennis, basketball, etc.).',
+    ),
+    _ActivityCategory(
+      key: 'mobility',
+      label: 'Mobility / stretching',
+      description: 'Yoga, stretching, mobility drills.',
+    ),
+  ];
 
   @override
   void initState() {
     super.initState();
-    _heightController.addListener(_updateDerivedMetrics);
-    _weightController.addListener(_updateDerivedMetrics);
-    _fullNameFocusNode.addListener(
-      () => _handleFocusChange(
-        _fullNameFocusNode,
-        _FieldId.fullName,
-        _fullNameFieldKey,
-      ),
-    );
-    _heightFocusNode.addListener(
-      () => _handleFocusChange(
-        _heightFocusNode,
-        _FieldId.height,
-        _heightFieldKey,
-      ),
-    );
-    _weightFocusNode.addListener(
-      () => _handleFocusChange(
-        _weightFocusNode,
-        _FieldId.weight,
-        _weightFieldKey,
-      ),
-    );
-    _applyInitialAnswers();
-    _loadInteractionLog();
+    _hydrateFromInitial(widget.initialAnswers);
   }
 
-  Widget _buildValidatedField({
-    required BuildContext context,
-    required _FieldId fieldId,
-    required Widget child,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [child, _validationIndicator(context, fieldId)],
+  List<_ConditionOption> _filteredConditionOptions(String query) {
+    final lower = query.trim().toLowerCase();
+    if (lower.isEmpty) {
+      return _conditionCatalog.values.expand((c) => c).toList();
+    }
+    return _conditionCatalog.values
+        .expand((c) => c)
+        .where((c) => c.label.toLowerCase().contains(lower))
+        .toList();
+  }
+
+  bool _hasConditionSelected(String code) =>
+      _selectedConditions.any((c) => c.code == code);
+
+  Widget _conditionResultTile(_ConditionOption option) {
+    final selected = _hasConditionSelected(option.code);
+    return CheckboxListTile(
+      title: Text(option.label),
+      subtitle: Text(option.code),
+      value: selected,
+      onChanged: (_) => _toggleCondition(option),
     );
   }
 
-  Widget _validationIndicator(BuildContext context, _FieldId fieldId) {
-    final theme = Theme.of(context);
-    final isValid = _fieldValidity[fieldId] == true;
-    return AnimatedSwitcher(
-      duration: _kValidationFadeDuration,
-      transitionBuilder: (child, animation) =>
-          FadeTransition(opacity: animation, child: child),
-      child: isValid
-          ? Padding(
-              key: ValueKey('${fieldId.name}-valid'),
-              padding: const EdgeInsets.only(top: 6),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.check_circle,
-                    size: 16,
-                    color: theme.colorScheme.primary,
+  void _toggleCondition(_ConditionOption option) {
+    setState(() {
+      if (_hasConditionSelected(option.code)) {
+        _selectedConditions.removeWhere((c) => c.code == option.code);
+        return;
+      }
+      if (option.code == 'NONE') {
+        _selectedConditions
+          ..clear()
+          ..add(_SelectedCondition(label: option.label, code: option.code));
+      } else {
+        _selectedConditions.removeWhere((c) => c.code == 'NONE');
+        _selectedConditions.add(
+          _SelectedCondition(label: option.label, code: option.code),
+        );
+      }
+    });
+  }
+
+  Widget _conditionDetailEditor(_SelectedCondition condition) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    condition.label,
+                    style: const TextStyle(fontWeight: FontWeight.w600),
                   ),
-                  const SizedBox(width: 4),
-                  Text(
-                    'Looks good',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.primary,
+                ),
+                Text(
+                  condition.code,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.delete_outline),
+                  onPressed: () {
+                    setState(() {
+                      _selectedConditions.remove(condition);
+                    });
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                Expanded(
+                  child: DropdownButtonFormField<String>(
+                    value: condition.isCurrent ? 'current' : 'past',
+                    decoration: const InputDecoration(
+                      labelText: 'Status',
                     ),
+                    items: const [
+                      DropdownMenuItem(
+                        value: 'current',
+                        child: Text('Current'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'past',
+                        child: Text('Past'),
+                      ),
+                    ],
+                    onChanged: (value) {
+                      if (value == null) return;
+                      setState(() {
+                        condition.isCurrent = value == 'current';
+                      });
+                    },
                   ),
-                ],
-              ),
-            )
-          : SizedBox.shrink(key: ValueKey('${fieldId.name}-empty')),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextFormField(
+                    key: ValueKey('${condition.code}-year-${condition.diagnosedYear ?? ''}'),
+                    initialValue: condition.diagnosedYear,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Diagnosed year',
+                      hintText: 'Optional',
+                    ),
+                    onChanged: (value) {
+                      condition.diagnosedYear = value.trim();
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 
-  void _handleFocusChange(
-    FocusNode node,
-    _FieldId fieldId,
-    GlobalKey<FormFieldState<String>> key,
-  ) {
-    if (node.hasFocus) return;
-    _validateFormField(fieldId, key);
-    // Auto-save draft when field loses focus
-    _persistProfileDraft();
-  }
-
-  void _invalidateField(_FieldId fieldId) {
-    if (_fieldValidity[fieldId] != true) return;
-    final section = _fieldSection[fieldId];
-    setState(() {
-      _fieldValidity[fieldId] = false;
-      if (section != null) {
-        _sectionSaved[section] = false;
-      }
-    });
-  }
-
-  void _validateFormField(
-    _FieldId fieldId,
-    GlobalKey<FormFieldState<String>> key,
-  ) {
-    final isValid = key.currentState?.validate() ?? false;
-    _updateFieldValidity(fieldId, isValid);
-  }
-
-  void _validateDropdownField(
-    _FieldId fieldId,
-    GlobalKey<FormFieldState<String>> key,
-  ) {
-    final isValid = key.currentState?.validate() ?? false;
-    _updateFieldValidity(fieldId, isValid);
-  }
-
-  void _updateFieldValidity(_FieldId fieldId, bool isValid) {
-    final previous = _fieldValidity[fieldId];
-    if (previous == isValid) return;
-    final section = _fieldSection[fieldId];
-    setState(() {
-      _fieldValidity[fieldId] = isValid;
-      if (!isValid && section != null) {
-        _sectionSaved[section] = false;
-      }
-    });
-    if (isValid) {
-      _maybeSaveSectionForField(fieldId);
+  List<_MedicationOption> _buildMedicationSuggestions() {
+    final selectedCodes = _selectedConditions.map((c) => c.code).toSet();
+    final suggestedLabels = <String>{};
+    for (final code in selectedCodes) {
+      final meds = _conditionMedicationShortcuts[code];
+      if (meds != null) suggestedLabels.addAll(meds);
     }
-  }
-
-  Future<void> _maybeSaveSectionForField(_FieldId fieldId) async {
-    final section = _fieldSection[fieldId];
-    if (section == null) return;
-    final fields = _sectionFields[section]!;
-    final allValid = fields.every((field) => _fieldValidity[field] == true);
-    if (!allValid) return;
-    if (_sectionSaved[section] == true || _sectionSaving[section] == true) {
-      return;
-    }
-    await _saveSection(section);
-  }
-
-  Future<void> _saveSection(_Section section) async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
-    setState(() {
-      _sectionSaving[section] = true;
-    });
-    try {
-      final payload = _buildSectionPayload(section);
-      final updated = Map<String, dynamic>.from(_draftAnswers);
-      updated.addAll(payload.topLevel);
-
-      final existingProfile = updated['profile'];
-      final profileMap = existingProfile is Map<String, dynamic>
-          ? Map<String, dynamic>.from(existingProfile)
-          : <String, dynamic>{};
-      profileMap[_sectionProfileKey(section)] = payload.profile;
-      updated['profile'] = profileMap;
-
-      _draftAnswers = updated;
-
-      await HealthQuestionnaireService.saveAnswersForUser(
-        user.uid,
-        Map<String, dynamic>.from(updated),
-      );
-
-      if (section == _Section.measurements) {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('glucoseUnit', _glucoseUnit);
-      }
-
-      if (!mounted) return;
-      setState(() {
-        _sectionSaved[section] = true;
-      });
-    } finally {
-      if (mounted) {
-        setState(() {
-          _sectionSaving[section] = false;
-        });
-      }
-    }
-  }
-
-  ({Map<String, dynamic> topLevel, Map<String, dynamic> profile})
-  _buildSectionPayload(_Section section) {
-    switch (section) {
-      case _Section.basic:
-        final topLevel = _withoutNulls(<String, dynamic>{
-          'fullName': _nameController.text.trim(),
-          'dateOfBirth': _dob?.toIso8601String(),
-          'gender': _gender,
-        });
-        final profile = _withoutNulls(<String, dynamic>{
-          'fullName': topLevel['fullName'],
-          'dateOfBirth': topLevel['dateOfBirth'],
-          'gender': topLevel['gender'],
-        });
-        return (topLevel: topLevel, profile: profile);
-      case _Section.measurements:
-        final heightValue = _parsePositiveNumber(_heightController.text);
-        final weightValue = _parsePositiveNumber(_weightController.text);
-        final heightCm = heightValue == null
-            ? null
-            : _heightUnit == 'cm'
-            ? heightValue
-            : heightValue * 2.54;
-        final weightKg = weightValue == null
-            ? null
-            : _weightUnit == 'kg'
-            ? weightValue
-            : weightValue * 0.45359237;
-        final bmi = heightCm != null && weightKg != null
-            ? _computeBmi(heightCm, weightKg)
-            : null;
-        final topLevel = _withoutNulls(<String, dynamic>{
-          'heightCm': heightCm,
-          'weightKg': weightKg,
-          'bmi': bmi,
-          'countryCode': _countryCode,
-          'glucoseUnit': _glucoseUnit,
-        });
-        final profile = Map<String, dynamic>.from(topLevel);
-        return (topLevel: topLevel, profile: profile);
-      case _Section.management:
-        final topLevel = _withoutNulls(<String, dynamic>{
-          'conditions': _conditions.toList(),
-          'medications': _medications.map((m) => Map<String, dynamic>.from(m)).toList(),
-        });
-        final profile = Map<String, dynamic>.from(topLevel);
-        return (topLevel: topLevel, profile: profile);
-    }
-  }
-
-  String _sectionProfileKey(_Section section) {
-    switch (section) {
-      case _Section.basic:
-        return 'basic';
-      case _Section.measurements:
-        return 'measurements';
-      case _Section.management:
-        return 'management';
-    }
-  }
-
-  Map<String, dynamic> _withoutNulls(Map<String, dynamic> source) {
-    source.removeWhere((key, value) => value == null);
-    return source;
-  }
-
-  void _refreshInitialValidity() {
-    _fieldValidity[_FieldId.fullName] = _nameController.text.trim().length >= 2;
-    _fieldValidity[_FieldId.dob] = _dob != null;
-    _fieldValidity[_FieldId.gender] = _gender != null && _gender!.isNotEmpty;
-
-    final heightValue = _parsePositiveNumber(_heightController.text);
-    final heightCm = heightValue == null
-        ? null
-        : _heightUnit == 'cm'
-        ? heightValue
-        : heightValue * 2.54;
-    _fieldValidity[_FieldId.height] =
-        heightCm != null && heightCm >= 50 && heightCm <= 250;
-
-    final weightValue = _parsePositiveNumber(_weightController.text);
-    final weightKg = weightValue == null
-        ? null
-        : _weightUnit == 'kg'
-        ? weightValue
-        : weightValue * 0.45359237;
-    _fieldValidity[_FieldId.weight] =
-        weightKg != null && weightKg >= 30 && weightKg <= 250;
-
-    _fieldValidity[_FieldId.country] =
-        _countryCode != null && _countryCode!.isNotEmpty;
-    _fieldValidity[_FieldId.conditions] = _conditions.isNotEmpty;
+    final existingNames = _medications.map((m) => m['name']).toSet();
+    return _medicationCatalog
+        .where(
+          (m) => suggestedLabels.contains(m.label) && !existingNames.contains(m.label),
+        )
+        .toList();
   }
 
   @override
   void dispose() {
-    _heightController.removeListener(_updateDerivedMetrics);
-    _weightController.removeListener(_updateDerivedMetrics);
-    _fullNameFocusNode.dispose();
-    _heightFocusNode.dispose();
-    _weightFocusNode.dispose();
-    _nameController.dispose();
+    _fullNameController.dispose();
+    _ageController.dispose();
     _dobController.dispose();
-    _heightController.dispose();
-    _weightController.dispose();
+    _otherDietController.dispose();
+    _sleepHoursController.dispose();
+    _smokingDetailsController.dispose();
     _conditionSearchController.dispose();
-    _sleepDurationController.dispose();
+    _medicationSearchController.dispose();
     super.dispose();
   }
 
-  _StepInfo _getStepInfo() {
-    // Single continuous flow - calculate completion based on filled fields
-    final totalSections = 7;
-    int completedSections = 0;
+  void _hydrateFromInitial(Map<String, dynamic>? initial) {
+    _initialAnswers = initial;
+    if (initial == null) return;
 
-    // Count completed sections
-    if (_nameController.text.isNotEmpty && _dob != null && _gender != null) completedSections++;
-    if (_conditions.isNotEmpty) completedSections++;
-    if (_workPattern != null) completedSections++;
-    // Can add more completion checks for other sections
+    final baseline = initial['baseline'] as Map<String, dynamic>?;
+    _baselineVersion = initial['baselineVersion']?.toString();
+    // Locking disabled: always editable
+    final progress = initial['progress'];
+    if (progress is Map) {
+      final savedPage = progress['pageIndex'] as int?;
+      if (savedPage != null && savedPage >= 0 && savedPage < _totalPages) {
+        _pageIndex = savedPage;
+      }
+    }
 
-    return _StepInfo(completedSections + 1, 'Health Profile');
+    final demographics = baseline?['demographics'];
+    if (demographics is Map) {
+      final dobString = demographics['dateOfBirth']?.toString();
+      if (dobString != null) {
+        _dateOfBirth = DateTime.tryParse(dobString);
+        if (_dateOfBirth != null) {
+          _dobController.text = _formatDate(_dateOfBirth!);
+        }
+      }
+      final ageValue = demographics['age'];
+      if (ageValue is num) {
+        _ageController.text = ageValue.toString();
+      }
+      final height = demographics['heightCm'];
+      final weight = demographics['weightKg'];
+      _fullNameController.text = demographics['fullName']?.toString() ?? '';
+      _sex = demographics['sex']?.toString();
+      _country = demographics['country']?.toString();
+      _useMetric = !_usesImperialUnits(_country);
+      if (height is num) {
+        _heightValue = _clampHeight(height.toDouble(), true);
+      }
+      if (weight is num) {
+        _weightValue = _clampWeight(weight.toDouble(), true);
+      }
+      if (!_useMetric) {
+        _heightValue = _clampHeight(_heightValue / 2.54, false);
+        _weightValue = _clampWeight(_weightValue / 0.45359237, false);
+      }
+    }
+
+    final medical = baseline?['medical'];
+    if (medical is Map) {
+          final conditions = medical['conditions'];
+          if (conditions is List) {
+            for (final entry in conditions) {
+              if (entry is Map) {
+                _selectedConditions.add(
+                  _SelectedCondition(
+                    label: entry['label']?.toString() ?? '',
+                    code: entry['code']?.toString() ?? '',
+                    isCurrent: entry['isCurrent'] == true,
+                    diagnosedYear: entry['diagnosedYear']?.toString(),
+                  ),
+                );
+              }
+            }
+          } else {
+            final legacy = medical['chronicDiagnoses'];
+            if (legacy is List) {
+              for (final item in legacy) {
+                final label = item.toString();
+                _selectedConditions.add(
+                  _SelectedCondition(label: label, code: label),
+                );
+              }
+            }
+          }
+    }
+
+    final meds = baseline?['medications'];
+    if (meds is Map) {
+      _takesPrescriptions =
+          meds['hasPrescriptions'] == true || _medications.isNotEmpty;
+      _takesSupplements = meds['hasSupplements'] == true;
+      final prescriptions = meds['prescriptions'];
+      if (prescriptions is List) {
+        _medications.addAll(
+          prescriptions
+              .whereType<Map>()
+              .map((e) => e.map((key, value) =>
+                  MapEntry(key.toString(), value?.toString() ?? '')))
+              .toList(),
+        );
+        if (_medications.isNotEmpty) {
+          _takesPrescriptions = true;
+        }
+      }
+      final supplements = meds['supplements'];
+      if (supplements is List) {
+        _supplements.addAll(
+          supplements
+              .whereType<Map>()
+              .map((e) => e.map((key, value) =>
+                  MapEntry(key.toString(), value?.toString() ?? '')))
+              .toList(),
+        );
+        if (_supplements.isNotEmpty) {
+          _takesSupplements = true;
+        }
+      }
+    }
+
+    final routine = baseline?['routine'];
+    if (routine is Map) {
+      _wakeUpTime = _parseTime(routine['wakeUp']);
+      _bedTime = _parseTime(routine['bedTime']);
+      _dinnerTime = _parseTime(routine['dinnerTime']);
+      _typicalSleepQuality = routine['sleepQuality']?.toString();
+      _workShift = routine['workShift']?.toString();
+      _breakfastHabit = routine['breakfastHabit']?.toString();
+      final meals = routine['mealsPerDay'];
+      if (meals is num) _mealsPerDay = meals.toInt();
+    }
+
+    final sleep = baseline?['sleep'];
+    if (sleep is Map) {
+      final hours = sleep['avgHours'];
+      _sleepHours = hours is num ? hours.toDouble() : null;
+      if (_sleepHours != null) {
+        _sleepHoursController.text =
+            _sleepHours!.toStringAsFixed(_sleepHours! % 1 == 0 ? 0 : 1);
+      }
+      _sleepQuality = sleep['quality']?.toString();
+      final disturbances = sleep['disturbances'];
+      if (disturbances is List) {
+        _sleepDisturbances = disturbances.map((e) => e.toString()).toSet();
+      }
+      final disorders = sleep['sleepDisorders'];
+      if (disorders is List) {
+        _sleepDisorders = disorders.map((e) => e.toString()).toSet();
+      }
+    }
+
+    final nutrition = baseline?['nutrition'];
+    if (nutrition is Map) {
+      _dietPattern = nutrition['dietPattern']?.toString();
+      final restrictions = nutrition['restrictions'];
+      if (restrictions is List) {
+        _dietRestrictionSelections =
+            restrictions.map((e) => e.toString()).toSet();
+      }
+      _alcoholUse = nutrition['alcohol']?.toString();
+      _caffeineUse = nutrition['caffeinePerDay']?.toString();
+      _otherDietController.text =
+          nutrition['dietNote']?.toString().trim() ?? '';
+    }
+
+    final activity = baseline?['activity'];
+    if (activity is Map) {
+      _activityFrequency = activity['frequencyPerWeek'] is int
+          ? activity['frequencyPerWeek'] as int
+          : int.tryParse(activity['frequencyPerWeek']?.toString() ?? '');
+      _activityIntensity = activity['intensity']?.toString();
+      final limitations = activity['limitations'];
+      if (limitations is List) {
+        _activityLimitations = limitations.map((e) => e.toString()).toSet();
+      }
+      final categories = activity['categories'];
+      if (categories is Map) {
+        categories.forEach((key, value) {
+          final map = value as Map?;
+          if (map == null) return;
+          final input = _categoryInputs[key];
+          if (input != null) {
+            input.daysPerWeek = _toInt(map['daysPerWeek']);
+            input.minutesPerSession = _toInt(map['minutesPerSession']);
+            input.intensity = map['intensity']?.toString();
+          }
+        });
+      }
+      _stepRange = activity['stepRange']?.toString();
+      _jobActivity = activity['jobActivity']?.toString();
+      final equipment = activity['equipment'];
+      if (equipment is List) {
+        _equipmentAccess = equipment.map((e) => e.toString()).toSet();
+      }
+      _trainingHistory = activity['trainingHistory']?.toString();
+    }
+
+    final mental = baseline?['mental'];
+    if (mental is Map) {
+      _stressLevel = mental['stress']?.toString();
+      _mood = mental['mood']?.toString();
+      _focusIssues = mental['focusIssues'] == true;
+      _burnout = mental['burnoutIndicators'] == true;
+    }
+
+    final risks = baseline?['risks'];
+    if (risks is Map) {
+      _smokingStatus = risks['smokingStatus']?.toString();
+      _substanceUse = risks['substanceUse']?.toString();
+      final cardio = risks['cardiometabolicRisks'];
+      if (cardio is List) {
+        _cardioRisks = cardio.map((e) => e.toString()).toSet();
+      }
+      _smokingDetailsController.text = risks['riskNotes']?.toString() ?? '';
+    }
+
+    final finalReview = baseline?['finalReview'];
+    if (finalReview is Map) {
+      _consentGiven = finalReview['consentAccepted'] == true;
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final progress = (_pageIndex + 1) / _totalPages;
     final theme = Theme.of(context);
-    final isSaving = _sectionSaving.values.any((saving) => saving);
 
-    // Determine the leading button
-    Widget? leading;
-    if (widget.allowCancel) {
-      leading = BackButton(
-        onPressed: () {
-          final navigator = Navigator.of(context);
-          if (navigator.canPop()) {
-            navigator.pop();
-          }
-        },
-      );
-    }
-
-    // Map current page to step number and section name
-    final stepInfo = _getStepInfo();
-
-    final scaffold = Scaffold(
-      appBar: AppBar(
-        title: const Text('Health Profile'),
-        leading: leading,
-        bottom: _QuestionnaireProgressIndicator(
-          currentStep: stepInfo.step,
-          totalSteps: 7,
-          sectionName: stepInfo.sectionName,
-        ),
-      ),
-      body: _buildCurrentPage(theme),
-    );
-    if (widget.allowCancel) {
-      return scaffold;
-    }
-
-    // Handle back navigation between sections, but prevent exit from section 1
     return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, __) {
-        if (didPop) return;
-
-        // If in section 2, go back to section 1
-        if (_currentProfileSection == 1) {
-          _goBackToSection2();
-        } else if (_currentProfileSection == 0) {
-          // In section 1, show error message and prevent exit
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text('Please complete the health profile'),
-              duration: const Duration(milliseconds: 1500),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
-        }
-      },
-      child: scaffold,
-    );
-  }
-
-  Widget _buildCurrentPage(ThemeData theme) {
-    return MediaQuery(
-      data: MediaQuery.of(context).copyWith(
-        textScaler: const TextScaler.linear(1.0),
-      ),
-      child: KeyboardDismissible(
-        child: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Form(
-              key: _formKey,
-              autovalidateMode: AutovalidateMode.disabled,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Welcome header
-                  Text(
-                    "Let's personalize your health journey.",
-                    style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    "Your data is encrypted and stored securely.",
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-
-                  // All sections in one continuous flow
-                  ..._buildAllSections(theme),
-
-                  // Final submit button
-                  const SizedBox(height: 24),
-                  Text(
-                    'This helps us tailor your daily health insights.',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 12),
-                  FilledButton(
-                    onPressed: _handleSubmit,
-                    child: const Text('Complete Profile'),
-                  ),
-                  const SizedBox(height: 24),
-                ],
+      canPop: widget.allowCancel && !_saving,
+      onPopInvoked: widget.allowCancel
+          ? null
+          : (didPop) {
+              if (didPop) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content:
+                      Text('Complete the baseline intake to continue setup.'),
+                ),
+              );
+            },
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Baseline intake'),
+          leading: widget.allowCancel ? const BackButton() : null,
+          bottom: PreferredSize(
+            preferredSize: const Size.fromHeight(6),
+            child: LinearProgressIndicator(
+              value: progress,
+              minHeight: 6,
+              backgroundColor: theme.colorScheme.surfaceContainerHighest,
+              valueColor: AlwaysStoppedAnimation<Color>(
+                theme.colorScheme.primary,
               ),
             ),
           ),
         ),
+        body: KeyboardDismissible(
+          child: SafeArea(
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 200),
+              child: _buildPage(theme),
+            ),
+          ),
+        ),
+        bottomNavigationBar: _buildNavigation(theme, progress),
       ),
     );
   }
 
-  List<Widget> _buildAllSections(ThemeData theme) {
-    return [
-      // Section 1: Personal Details
-      ..._buildSection1(theme),
-
-      const SizedBox(height: 32),
-      const Divider(),
-      const SizedBox(height: 24),
-
-      // Section 2: Health Conditions
-      ..._buildSection3(theme),
-
-      // Additional sections will be added here
-    ];
-  }
-
-  List<Widget> _buildSection1(ThemeData theme) {
-    return [
-                  Text(
-                    'Personal Details',
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: theme.colorScheme.onSurface,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  _buildValidatedField(
-                    context: context,
-                    fieldId: _FieldId.fullName,
-                    child: TextFormField(
-                      key: _fullNameFieldKey,
-                      focusNode: _fullNameFocusNode,
-                      controller: _nameController,
-                      textCapitalization: TextCapitalization.words,
-                      textInputAction: TextInputAction.next,
-                      decoration: const InputDecoration(
-                        labelText: 'Full name',
-                        hintText: 'e.g., John Smith',
-                      ),
-                      onTap: () => HapticFeedback.lightImpact(),
-                      onChanged: (newValue) {
-                        _logInteraction(
-                          eventType: 'field_change',
-                          field: 'fullName',
-                          oldValue: null,
-                          newValue: newValue,
-                        );
-                        _invalidateField(_FieldId.fullName);
-                      },
-                      onEditingComplete: () => _validateFormField(
-                        _FieldId.fullName,
-                        _fullNameFieldKey,
-                      ),
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return 'Please enter your name';
-                        }
-                        if (value.trim().length < 2) {
-                          return 'Name looks too short';
-                        }
-                        return null;
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  _buildValidatedField(
-                    context: context,
-                    fieldId: _FieldId.dob,
-                    child: TextFormField(
-                      key: _dobFieldKey,
-                      controller: _dobController,
-                      readOnly: true,
-                      decoration: const InputDecoration(
-                        labelText: 'Date of birth',
-                        hintText: 'Select your birth date',
-                        suffixIcon: Icon(Icons.calendar_today),
-                      ),
-                      onTap: () {
-                        HapticFeedback.lightImpact();
-                        _pickDateOfBirth();
-                      },
-                      validator: (_) {
-                        if (_dob == null) {
-                          return 'Please choose your birth date';
-                        }
-                        final now = DateTime.now();
-                        if (_dob!.isAfter(now)) {
-                          return 'Birth date cannot be in the future';
-                        }
-                        return null;
-                      },
-                    ),
-                  ),
-                  if (_dob != null) ...[
-                    const SizedBox(height: 6),
-                    Text('Age: ${_calculateAge(_dob!)} years'),
-                  ],
-                  const SizedBox(height: 16),
-                  _buildValidatedField(
-                    context: context,
-                    fieldId: _FieldId.country,
-                    child: DropdownButtonFormField<String>(
-                      key: _countryFieldKey,
-                      initialValue: _countryCode,
-                      decoration: const InputDecoration(
-                        labelText: 'Country',
-                      ),
-                      items: _regionOptions
-                          .map(
-                            (region) => DropdownMenuItem<String>(
-                              value: region.code,
-                              child: Text(region.label),
-                            ),
-                          )
-                          .toList(),
-                      onChanged: (value) {
-                        HapticFeedback.lightImpact();
-                        _selectCountry(value);
-                      },
-                      validator: (value) => value == null
-                          ? 'Please choose a country or region'
-                          : null,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  _buildValidatedField(
-                    context: context,
-                    fieldId: _FieldId.gender,
-                    child: DropdownButtonFormField<String>(
-                      key: _genderFieldKey,
-                      initialValue: _gender,
-                      decoration: const InputDecoration(
-                        labelText: 'Sex at birth',
-                      ),
-                      items: _sexOptions
-                          .map(
-                            (option) => DropdownMenuItem<String>(
-                              value: option.value,
-                              child: Text(option.label),
-                            ),
-                          )
-                          .toList(),
-                      onChanged: (value) {
-                        HapticFeedback.lightImpact();
-                        final oldGender = _gender;
-                        _logInteraction(
-                          eventType: 'selection',
-                          field: 'gender',
-                          oldValue: oldGender,
-                          newValue: value,
-                        );
-                        setState(() => _gender = value);
-                        _persistProfileDraft(); // Auto-save on selection change
-                        if (value == null) {
-                          _updateFieldValidity(_FieldId.gender, false);
-                        } else {
-                          _validateDropdownField(
-                            _FieldId.gender,
-                            _genderFieldKey,
-                          );
-                        }
-                      },
-                      validator: (value) => value == null
-                          ? 'Select the option that fits best'
-                          : null,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  Text(
-                    'Body Metrics',
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: theme.colorScheme.onSurface,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Expanded(
-                        child: _buildValidatedField(
-                          context: context,
-                          fieldId: _FieldId.height,
-                          child: TextFormField(
-                            key: _heightFieldKey,
-                            focusNode: _heightFocusNode,
-                            controller: _heightController,
-                            keyboardType: const TextInputType.numberWithOptions(
-                              decimal: true,
-                            ),
-                            textInputAction: TextInputAction.next,
-                            decoration: const InputDecoration(
-                              labelText: 'Height',
-                              hintText: 'e.g., 176 cm',
-                            ),
-                            onTap: () => HapticFeedback.lightImpact(),
-                            onChanged: (newValue) {
-                              _logInteraction(
-                                eventType: 'field_change',
-                                field: 'height',
-                                oldValue: null,
-                                newValue: newValue,
-                                metadata: {'unit': _heightUnit},
-                              );
-                              _invalidateField(_FieldId.height);
-                            },
-                            onEditingComplete: () => _validateFormField(
-                              _FieldId.height,
-                              _heightFieldKey,
-                            ),
-                            validator: (value) {
-                              final parsed = _parsePositiveNumber(value);
-                              if (parsed == null) {
-                                return 'Enter your height';
-                              }
-                              final heightCm = _heightUnit == 'cm'
-                                  ? parsed
-                                  : parsed * 2.54;
-                              if (heightCm < 50 || heightCm > 250) {
-                                return 'Height should be between 50 and 250 cm';
-                              }
-                              return null;
-                            },
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      SizedBox(
-                        width: 140,
-                        child: DropdownButtonFormField<String>(
-                          key: ValueKey('heightUnit-$_heightUnit'),
-                          initialValue: _heightUnit,
-                          decoration: const InputDecoration(labelText: 'Unit'),
-                          items: const [
-                            DropdownMenuItem(value: 'cm', child: Text('cm')),
-                            DropdownMenuItem(
-                              value: 'in',
-                              child: Text('inches'),
-                            ),
-                          ],
-                          onChanged: (value) {
-                            if (value == null) return;
-                            _changeHeightUnit(value);
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Expanded(
-                        child: _buildValidatedField(
-                          context: context,
-                          fieldId: _FieldId.weight,
-                          child: TextFormField(
-                            key: _weightFieldKey,
-                            focusNode: _weightFocusNode,
-                            controller: _weightController,
-                            keyboardType: const TextInputType.numberWithOptions(
-                              decimal: true,
-                            ),
-                            textInputAction: TextInputAction.next,
-                            decoration: const InputDecoration(
-                              labelText: 'Weight',
-                              hintText: 'e.g., 68 kg',
-                            ),
-                            onTap: () => HapticFeedback.lightImpact(),
-                            onChanged: (newValue) {
-                              _logInteraction(
-                                eventType: 'field_change',
-                                field: 'weight',
-                                oldValue: null,
-                                newValue: newValue,
-                                metadata: {'unit': _weightUnit},
-                              );
-                              _invalidateField(_FieldId.weight);
-                            },
-                            onEditingComplete: () => _validateFormField(
-                              _FieldId.weight,
-                              _weightFieldKey,
-                            ),
-                            validator: (value) {
-                              final parsed = _parsePositiveNumber(value);
-                              if (parsed == null) {
-                                return 'Enter your weight';
-                              }
-                              final weightKg = _weightUnit == 'kg'
-                                  ? parsed
-                                  : parsed * 0.45359237;
-                              if (weightKg < 30 || weightKg > 250) {
-                                return 'Weight should be between 30 and 250 kg';
-                              }
-                              return null;
-                            },
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      SizedBox(
-                        width: 140,
-                        child: DropdownButtonFormField<String>(
-                          key: ValueKey('weightUnit-$_weightUnit'),
-                          initialValue: _weightUnit,
-                          decoration: const InputDecoration(labelText: 'Unit'),
-                          items: const [
-                            DropdownMenuItem(value: 'kg', child: Text('kg')),
-                            DropdownMenuItem(
-                              value: 'lb',
-                              child: Text('pounds'),
-                            ),
-                          ],
-                          onChanged: (value) {
-                            if (value == null) return;
-                            _changeWeightUnit(value);
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (_bmi != null) ...[
-                    const SizedBox(height: 6),
-                    Text('BMI: ${_bmi!.toStringAsFixed(1)}'),
-                  ],
-    ];
-  }
-
-
-  List<Widget> _buildSection3(ThemeData theme) {
-    final searchQuery = _conditionSearchController.text.trim().toLowerCase();
-    final hasSearch = searchQuery.isNotEmpty;
-
-    return [
-      // Section header
-      Text(
-        'Health Conditions',
-        style: theme.textTheme.titleLarge?.copyWith(
-          fontWeight: FontWeight.bold,
-          color: theme.colorScheme.onSurface,
-        ),
-      ),
-      const SizedBox(height: 8),
-      Text(
-        'Select any health conditions you have been diagnosed with.',
-        style: theme.textTheme.bodyMedium?.copyWith(
-          color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
-        ),
-      ),
-      const SizedBox(height: 16),
-
-      // Search bar
-      TextField(
-        controller: _conditionSearchController,
-        decoration: InputDecoration(
-          hintText: 'Search conditions (e.g., hypertension, diabetes, PCOS)',
-          prefixIcon: const Icon(Icons.search),
-          suffixIcon: hasSearch
-              ? IconButton(
-                  icon: const Icon(Icons.clear),
-                  onPressed: () {
-                    setState(() {
-                      _conditionSearchController.clear();
-                    });
+  Widget _buildNavigation(ThemeData theme, double progress) {
+    final isLast = _pageIndex == _totalPages - 1;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      child: Row(
+        children: [
+          if (_pageIndex > 0)
+            OutlinedButton(
+              onPressed: _saving ? null : _previousPage,
+              child: const Text('Back'),
+            )
+          else
+            const SizedBox.shrink(),
+          const Spacer(),
+          ElevatedButton(
+            onPressed: _saving
+                ? null
+                : () async {
+                    await (isLast ? _completeFlow() : _nextPage());
                   },
-                )
-              : null,
-          border: const OutlineInputBorder(),
-        ),
-        onChanged: (query) {
-          _logInteraction(
-            eventType: 'search',
-            field: 'conditionSearch',
-            oldValue: null,
-            newValue: query,
-          );
-          setState(() {});
-        },
-      ),
-      const SizedBox(height: 16),
-
-      // Collapsible category groups
-      if (hasSearch)
-        ..._buildSearchResults(theme, searchQuery)
-      else
-        ..._buildCollapsibleGroups(theme),
-
-      if (_showSelectionErrors && _conditions.isEmpty) ...[
-        const SizedBox(height: 8),
-        Text(
-          'Please select at least one condition or choose "No diagnoses".',
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.error,
+            child: Text(isLast ? 'Save' : 'Next'),
           ),
-          textAlign: TextAlign.center,
-        ),
-      ],
-    ];
+        ],
+      ),
+    );
   }
 
-  List<Widget> _buildCollapsibleGroups(ThemeData theme) {
-    final widgets = <Widget>[];
+  Widget _buildPage(ThemeData theme) {
+    switch (_pageIndex) {
+      case 0:
+        return _demographicsPage(theme);
+      case 1:
+        return _medicalPage(theme);
+      case 2:
+        return _medicationsPage(theme);
+      case 3:
+        return _typicalDayPage(theme);
+      case 4:
+        return _nutritionPage(theme);
+      case 5:
+        return _activityPage(theme);
+      case 6:
+        return _mentalPage(theme);
+      case 7:
+        return _riskPage(theme);
+      default:
+        return _reviewPage(theme);
+    }
+  }
 
-    for (final category in _conditionCategories) {
-      final isNone = category.value == 'none';
-      final isExpanded = _expandedConditionGroup == category.value;
-      final conditions = isNone ? <_LabeledOption>[] : (_conditionsByCategory[category.value] ?? []);
-      final selectedCount = conditions.where((c) => _conditions.contains(c.value)).length;
-      final hasNone = _conditions.contains('none');
-      final isSelected = isNone ? hasNone : selectedCount > 0;
+  Widget _sectionShell({
+    required String title,
+    required String subtitle,
+    required List<Widget> children,
+  }) {
+    return SingleChildScrollView(
+      key: ValueKey(title),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            subtitle,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+          ),
+          const SizedBox(height: 16),
+          ...children,
+        ],
+      ),
+    );
+  }
 
-      widgets.add(
-        Card(
-          margin: const EdgeInsets.only(bottom: 8),
+  String _formatDate(DateTime date) {
+    return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+  }
+
+  int _calculateAge(DateTime birthDate) {
+    final today = DateTime.now();
+    int age = today.year - birthDate.year;
+    if (today.month < birthDate.month ||
+        (today.month == birthDate.month && today.day < birthDate.day)) {
+      age--;
+    }
+    return age;
+  }
+
+  Future<void> _pickDateOfBirth() async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: _dateOfBirth ??
+          DateTime.now().subtract(const Duration(days: 365 * 30)),
+      firstDate: DateTime(1900),
+      lastDate: DateTime.now(),
+      helpText: 'Select your date of birth',
+    );
+
+    if (picked != null && picked != _dateOfBirth) {
+      setState(() {
+        _dateOfBirth = picked;
+        _dobController.text = _formatDate(picked);
+      });
+    }
+  }
+
+  bool _usesImperialUnits(String? country) {
+    if (country == null) return false;
+    switch (country) {
+      case 'United States':
+      case 'United Kingdom':
+      case 'Liberia':
+      case 'Myanmar (Burma)':
+        return true;
+      default:
+        return false;
+    }
+  }
+
+  Widget _demographicsPage(ThemeData theme) {
+    final heightRange = _heightRange(_useMetric);
+    final weightRange = _weightRange(_useMetric);
+    final heightValue = _clampHeight(_heightValue, _useMetric);
+    final weightValue = _clampWeight(_weightValue, _useMetric);
+    return _sectionShell(
+      title: 'Demographics & identity',
+      subtitle:
+          'Baseline-critical details to anchor all future comparisons. Required before moving on.',
+      children: [
+        Form(
+          key: _demographicsFormKey,
           child: Column(
             children: [
-              InkWell(
-                onTap: () {
-                  if (isNone) {
-                    // Toggle "No diagnoses"
-                    final oldHasNone = hasNone;
-                    _logInteraction(
-                      eventType: 'selection',
-                      field: 'condition',
-                      oldValue: oldHasNone,
-                      newValue: !oldHasNone,
-                      metadata: {'condition': 'none', 'action': oldHasNone ? 'remove' : 'add'},
-                    );
-                    setState(() {
-                      if (hasNone) {
-                        _conditions.remove('none');
-                      } else {
-                        _conditions.clear();
-                        _conditions.add('none');
-                        _expandedConditionGroup = null;
-                      }
-                      _updateFieldValidity(_FieldId.conditions, _conditions.isNotEmpty);
-                    });
-                    _persistProfileDraft();
-                  } else {
-                    // Toggle expansion
-                    final oldExpanded = _expandedConditionGroup;
-                    final newExpanded = isExpanded ? null : category.value;
-                    _logInteraction(
-                      eventType: 'navigation',
-                      field: 'categoryExpansion',
-                      oldValue: oldExpanded,
-                      newValue: newExpanded,
-                      metadata: {'action': isExpanded ? 'collapse' : 'expand'},
-                    );
-                    setState(() {
-                      _expandedConditionGroup = newExpanded;
-                    });
+              TextFormField(
+                controller: _fullNameController,
+                textCapitalization: TextCapitalization.words,
+                decoration: const InputDecoration(labelText: 'Full name'),
+                onTap: () => HapticFeedback.lightImpact(),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Enter your name';
                   }
+                  if (value.trim().length < 2) {
+                    return 'Name looks too short';
+                  }
+                  return null;
                 },
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    category.label,
-                                    style: theme.textTheme.titleSmall?.copyWith(
-                                      fontWeight: FontWeight.w600,
-                                      color: isSelected ? theme.colorScheme.primary : null,
-                                    ),
-                                  ),
-                                ),
-                                if (selectedCount > 0)
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: theme.colorScheme.primary,
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: Text(
-                                      '$selectedCount',
-                                      style: theme.textTheme.bodySmall?.copyWith(
-                                        color: theme.colorScheme.onPrimary,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ),
-                              ],
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              category.description,
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: theme.colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      if (!isNone)
-                        Icon(
-                          isExpanded ? Icons.expand_less : Icons.expand_more,
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                    ],
-                  ),
-                ),
               ),
-
-              // Expanded condition checkboxes
-              if (isExpanded && !isNone)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _dobController,
+                readOnly: true,
+                decoration: const InputDecoration(
+                  labelText: 'Date of birth',
+                  hintText: 'Select your birth date',
+                  suffixIcon: Icon(Icons.calendar_today),
+                ),
+                onTap: () {
+                  HapticFeedback.lightImpact();
+                  _pickDateOfBirth();
+                },
+                validator: (_) {
+                  if (_dateOfBirth == null) {
+                    return 'Please choose your birth date';
+                  }
+                  final now = DateTime.now();
+                  if (_dateOfBirth!.isAfter(now)) {
+                    return 'Birth date cannot be in the future';
+                  }
+                  final age = _calculateAge(_dateOfBirth!);
+                  if (age < 5 || age > 120) {
+                    return 'Age must be between 5 and 120';
+                  }
+                  return null;
+                },
+              ),
+              if (_dateOfBirth != null) ...[
+                const SizedBox(height: 6),
+                Text('Age: ${_calculateAge(_dateOfBirth!)} years'),
+              ],
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                value: _sex,
+                decoration: const InputDecoration(labelText: 'Sex'),
+                items: const [
+                  DropdownMenuItem(value: 'female', child: Text('Female')),
+                  DropdownMenuItem(value: 'male', child: Text('Male')),
+                ],
+                onChanged: (value) => setState(() => _sex = value),
+                validator: (value) =>
+                    value == null ? 'Select the option that fits best' : null,
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                value: _country,
+                decoration: const InputDecoration(labelText: 'Country/region'),
+                items: _countryOptions
+                    .map(
+                      (country) =>
+                          DropdownMenuItem(value: country, child: Text(country)),
+                    )
+                    .toList(),
+                onChanged: (value) {
+                  setState(() {
+                    _country = value;
+                    final wantsImperial = _usesImperialUnits(value);
+                    if (wantsImperial && _useMetric) {
+                      _useMetric = false;
+                      _heightValue =
+                          _clampHeight(_heightValue / 2.54, _useMetric);
+                      _weightValue =
+                          _clampWeight(_weightValue / 0.45359237, _useMetric);
+                    } else if (!wantsImperial && !_useMetric) {
+                      _useMetric = true;
+                      _heightValue =
+                          _clampHeight(_heightValue * 2.54, _useMetric);
+                      _weightValue =
+                          _clampWeight(_weightValue * 0.45359237, _useMetric);
+                    }
+                  });
+                },
+                validator: (value) =>
+                    value == null ? 'Select where you live' : null,
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Text(
+                    'Units',
+                    style: theme.textTheme.bodyMedium
+                        ?.copyWith(fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(width: 12),
+                  ChoiceChip(
+                    label: const Text('Metric'),
+                    selected: _useMetric,
+                    onSelected: (selected) {
+                      if (!selected) return;
+                      setState(() {
+                        _useMetric = true;
+                        _heightValue =
+                            _clampHeight(_heightValue * 2.54, _useMetric);
+                        _weightValue =
+                            _clampWeight(_weightValue * 0.45359237, _useMetric);
+                      });
+                    },
+                  ),
+                  const SizedBox(width: 8),
+                  ChoiceChip(
+                    label: const Text('Standard'),
+                    selected: !_useMetric,
+                    onSelected: (selected) {
+                      if (!selected) return;
+                      setState(() {
+                        _useMetric = false;
+                        _heightValue =
+                            _clampHeight(_heightValue / 2.54, _useMetric);
+                        _weightValue =
+                            _clampWeight(_weightValue / 0.45359237, _useMetric);
+                      });
+                    },
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: conditions.map((condition) {
-                      final isChecked = _conditions.contains(condition.value);
-                      return CheckboxListTile(
-                        title: Text(condition.label),
-                        value: isChecked,
-                        dense: true,
-                        contentPadding: EdgeInsets.zero,
-                        onChanged: (checked) {
-                          final wasChecked = isChecked;
-                          _logInteraction(
-                            eventType: 'selection',
-                            field: 'condition',
-                            oldValue: wasChecked,
-                            newValue: checked,
-                            metadata: {
-                              'condition': condition.value,
-                              'conditionLabel': condition.label,
-                              'action': checked == true ? 'add' : 'remove',
-                            },
-                          );
-                          setState(() {
-                            _conditions.remove('none');
-                            if (checked == true) {
-                              _conditions.add(condition.value);
-                            } else {
-                              _conditions.remove(condition.value);
-                            }
-                            _updateFieldValidity(_FieldId.conditions, _conditions.isNotEmpty);
-                          });
-                          _persistProfileDraft();
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Height',
+                            style: theme.textTheme.bodyMedium
+                                ?.copyWith(fontWeight: FontWeight.w600),
+                          ),
+                          Text(_formatHeightLabel()),
+                        ],
+                      ),
+                      Slider(
+                        value: heightValue.toDouble(),
+                        min: heightRange.min,
+                        max: heightRange.max,
+                        divisions: _useMetric ? 130 : 100,
+                        label: _formatHeightLabel(),
+                        onChanged: (value) {
+                          setState(() => _heightValue = value);
                         },
-                      );
-                    }).toList(),
+                      ),
+                    ],
                   ),
                 ),
+              ),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Weight',
+                            style: theme.textTheme.bodyMedium
+                                ?.copyWith(fontWeight: FontWeight.w600),
+                          ),
+                          Text(_formatWeightLabel()),
+                        ],
+                      ),
+                      Slider(
+                        value: weightValue.toDouble(),
+                        min: weightRange.min,
+                        max: weightRange.max,
+                        divisions: _useMetric ? 220 : 240,
+                        label: _formatWeightLabel(),
+                        onChanged: (value) {
+                          setState(() => _weightValue = value);
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ],
           ),
         ),
-      );
-    }
-
-    return widgets;
+      ],
+    );
   }
 
-  List<Widget> _buildSearchResults(ThemeData theme, String query) {
-    // Flatten all conditions with their category
-    final allConditions = <Map<String, dynamic>>[];
-    for (final category in _conditionCategories) {
-      if (category.value == 'none') continue;
-      final conditions = _conditionsByCategory[category.value] ?? [];
-      for (final condition in conditions) {
-        allConditions.add({
-          'category': category.label,
-          'value': condition.value,
-          'label': condition.label,
-        });
-      }
-    }
+  Widget _typicalDayPage(ThemeData theme) {
+    return _sectionShell(
+      title: 'Typical day',
+      subtitle: 'Daily rhythm to contextualize sleep, meals, and energy.',
+      children: [
+        Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          children: [
+            _timePickerTile(
+              label: 'Wake-up time',
+              value: _timeLabel(_wakeUpTime),
+              onTap: () async {
+                final picked = await _pickTime(_wakeUpTime);
+                if (picked != null) {
+                  setState(() => _wakeUpTime = picked);
+                }
+              },
+            ),
+            _timePickerTile(
+              label: 'Bedtime',
+              value: _timeLabel(_bedTime),
+              onTap: () async {
+                final picked = await _pickTime(_bedTime);
+                if (picked != null) {
+                  setState(() => _bedTime = picked);
+                }
+              },
+            ),
+            _timePickerTile(
+              label: 'Dinner time',
+              value: _timeLabel(_dinnerTime),
+              onTap: () async {
+                final picked = await _pickTime(_dinnerTime);
+                if (picked != null) {
+                  setState(() => _dinnerTime = picked);
+                }
+              },
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        DropdownButtonFormField<String>(
+          value: _typicalSleepQuality,
+          decoration: const InputDecoration(labelText: 'Sleep quality'),
+          items: const [
+            DropdownMenuItem(value: 'restorative', child: Text('Restorative')),
+            DropdownMenuItem(value: 'ok', child: Text('Okay')),
+            DropdownMenuItem(value: 'poor', child: Text('Poor')),
+          ],
+          onChanged: (value) => setState(() => _typicalSleepQuality = value),
+        ),
+        const SizedBox(height: 12),
+        DropdownButtonFormField<String>(
+          value: _workShift,
+          decoration: const InputDecoration(labelText: 'Work shift'),
+          items: const [
+            DropdownMenuItem(value: 'day', child: Text('Day shift')),
+            DropdownMenuItem(value: 'night', child: Text('Night shift')),
+            DropdownMenuItem(value: 'rotating', child: Text('Rotating/variable')),
+            DropdownMenuItem(value: 'none', child: Text('Not working')),
+          ],
+          onChanged: (value) => setState(() => _workShift = value),
+        ),
+        const SizedBox(height: 12),
+        DropdownButtonFormField<String>(
+          value: _breakfastHabit,
+          decoration: const InputDecoration(labelText: 'Breakfast habit'),
+          items: const [
+            DropdownMenuItem(value: 'daily', child: Text('Every day')),
+            DropdownMenuItem(value: 'sometimes', child: Text('Sometimes')),
+            DropdownMenuItem(value: 'never', child: Text('Never')),
+          ],
+          onChanged: (value) => setState(() => _breakfastHabit = value),
+        ),
+        const SizedBox(height: 12),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Meals per day',
+              style: theme.textTheme.bodyMedium,
+            ),
+            Slider(
+              value: (_mealsPerDay ?? 3).toDouble(),
+              min: 1,
+              max: 6,
+              divisions: 5,
+              label: '${_mealsPerDay ?? 3}',
+              onChanged: (value) {
+                setState(() => _mealsPerDay = value.round());
+              },
+            ),
+          ],
+        ),
+      ],
+    );
+  }
 
-    // Filter by search query
-    final results = allConditions.where((c) {
-      return (c['label'] as String).toLowerCase().contains(query);
-    }).toList();
+  Widget _medicalPage(ThemeData theme) {
+    final query = _conditionSearchController.text.trim().toLowerCase();
+    final hasQuery = query.isNotEmpty;
+    final options = _filteredConditionOptions(query);
 
-    if (results.isEmpty) {
-      return [
-        Padding(
-          padding: const EdgeInsets.all(24),
-          child: Center(
-            child: Text(
-              'No conditions found for "$query"',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
+    return _sectionShell(
+      title: 'Medical conditions',
+      subtitle:
+          'Search or browse, then add follow-up details. This becomes the baseline condition profile.',
+      children: [
+        TextField(
+          controller: _conditionSearchController,
+          decoration: InputDecoration(
+            labelText: 'Search conditions',
+            hintText: 'e.g., hypertension, diabetes, asthma',
+            prefixIcon: const Icon(Icons.search),
+            suffixIcon: hasQuery
+                ? IconButton(
+                    icon: const Icon(Icons.clear),
+                    onPressed: () {
+                      setState(() => _conditionSearchController.clear());
+                    },
+                  )
+                : null,
+          ),
+          onChanged: (_) => setState(() {}),
+        ),
+        const SizedBox(height: 12),
+        if (hasQuery)
+          ...options.map(_conditionResultTile)
+        else
+          ..._conditionCatalog.entries.map(
+            (entry) => Card(
+              child: ExpansionTile(
+                title: Text(entry.key),
+                children: entry.value.map(_conditionResultTile).toList(),
               ),
             ),
           ),
-        ),
-      ];
-    }
-
-    return results.map((result) {
-      final isChecked = _conditions.contains(result['value']);
-      return CheckboxListTile(
-        title: Text(result['label'] as String),
-        subtitle: Text(
-          result['category'] as String,
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-        ),
-        value: isChecked,
-        onChanged: (checked) {
-          setState(() {
-            _conditions.remove('none');
-            if (checked == true) {
-              _conditions.add(result['value'] as String);
-            } else {
-              _conditions.remove(result['value']);
-            }
-            _updateFieldValidity(_FieldId.conditions, _conditions.isNotEmpty);
-          });
-          _persistProfileDraft();
-        },
-      );
-    }).toList();
-  }
-
-  // ===== MEDICATIONS PAGE (Stage 2) =====
-  List<Widget> _buildMedicationsPage(ThemeData theme) {
-    return [
-      Row(
-        children: [
-          IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () {
-              setState(() {
-                _conditionSubPage = 0;
-              });
-            },
-          ),
-          Expanded(
-            child: Text(
-              'Current Medications',
-              style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-            ),
-          ),
-        ],
-      ),
-      const SizedBox(height: 8),
-      Text(
-        'Add any medications you\'re currently taking (optional)',
-        style: theme.textTheme.bodyMedium?.copyWith(
-          color: theme.colorScheme.onSurfaceVariant,
-        ),
-      ),
-      const SizedBox(height: 16),
-
-      // Medication list
-      if (_medications.isEmpty)
-        Padding(
-          padding: const EdgeInsets.all(24),
-          child: Center(
-            child: Text(
-              'No medications added yet',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
+        const SizedBox(height: 12),
+        if (_selectedConditions.isNotEmpty)
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Selected conditions',
+                    style: theme.textTheme.titleMedium
+                        ?.copyWith(fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 8),
+                  ..._selectedConditions.map(_conditionDetailEditor),
+                ],
               ),
             ),
           ),
+        const SizedBox(height: 12),
+        if (_medicalValidationError != null)
+          Text(
+            _medicalValidationError!,
+            style:
+                theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.error),
+          ),
+      ],
+    );
+  }
+
+  Widget _medicationsPage(ThemeData theme) {
+    final query = _medicationSearchController.text.trim().toLowerCase();
+    final matches = _medicationCatalog
+        .where(
+          (m) => query.isEmpty || m.label.toLowerCase().contains(query),
         )
-      else
-        ..._medications.asMap().entries.map((entry) {
-          final index = entry.key;
-          final med = entry.value;
-          return Card(
-            margin: const EdgeInsets.only(bottom: 8),
-            child: ListTile(
-              title: Text(med['name'] ?? ''),
-              subtitle: Text(
-                '${med['dose'] ?? ''} • ${med['frequency'] ?? ''}',
-              ),
-              trailing: IconButton(
-                icon: const Icon(Icons.delete),
-                onPressed: () {
-                  final removedMed = _medications[index];
-                  _logInteraction(
-                    eventType: 'selection',
-                    field: 'medication',
-                    oldValue: removedMed,
-                    newValue: null,
-                    metadata: {'action': 'remove', 'medicationName': removedMed['name']},
-                  );
-                  setState(() {
-                    _medications.removeAt(index);
-                  });
-                  _persistProfileDraft();
-                },
-              ),
-            ),
-          );
-        }).toList(),
+        .toList();
+    final suggestions = _buildMedicationSuggestions();
 
-      const SizedBox(height: 16),
-
-      // Add medication button
-      OutlinedButton.icon(
-        onPressed: _showAddMedicationDialog,
-        icon: const Icon(Icons.add),
-        label: const Text('Add medication'),
-      ),
-
-      const SizedBox(height: 24),
-
-      // Continue button
-      FilledButton(
-        onPressed: _goToReviewPage,
-        child: const Text('Review & continue'),
-      ),
-
-      // Skip button
-      TextButton(
-        onPressed: _goToReviewPage,
-        child: const Text('Skip medications'),
-      ),
-    ];
-  }
-
-  // ===== REVIEW PAGE (Stage 3) =====
-  List<Widget> _buildReviewPage(ThemeData theme) {
-    return [
-      Row(
-        children: [
-          IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () {
-              setState(() {
-                _conditionSubPage = 1;
-              });
-            },
-          ),
-          Expanded(
-            child: Text(
-              'Review Your Information',
-              style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-            ),
-          ),
-        ],
-      ),
-      const SizedBox(height: 16),
-
-      // Conditions section
-      Card(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Conditions',
-                    style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                  ),
-                  TextButton(
+    return _sectionShell(
+      title: 'Medications',
+      subtitle:
+          'Search and add medications. We suggest common options based on your selected conditions, but you decide what to include.',
+      children: [
+        TextField(
+          controller: _medicationSearchController,
+          decoration: InputDecoration(
+            labelText: 'Search medications',
+            hintText: 'e.g., metformin, lisinopril',
+            prefixIcon: const Icon(Icons.search),
+            suffixIcon: query.isNotEmpty
+                ? IconButton(
+                    icon: const Icon(Icons.clear),
                     onPressed: () {
-                      setState(() {
-                        _conditionSubPage = 0;
-                      });
+                      setState(() => _medicationSearchController.clear());
                     },
-                    child: const Text('Edit'),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              ..._buildConditionsSummary(theme),
-            ],
+                  )
+                : null,
           ),
+          onChanged: (_) => setState(() {}),
         ),
-      ),
-
-      const SizedBox(height: 16),
-
-      // Medications section
-      Card(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Medications',
-                    style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                  ),
-                  TextButton(
-                    onPressed: () {
-                      setState(() {
-                        _conditionSubPage = 1;
-                      });
-                    },
-                    child: const Text('Edit'),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              if (_medications.isEmpty)
-                Text(
-                  'No medications',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
+        const SizedBox(height: 12),
+        if (query.isEmpty && suggestions.isNotEmpty) ...[
+          Text(
+            'Suggested for your conditions',
+            style: theme.textTheme.titleSmall
+                ?.copyWith(fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: suggestions
+                .map(
+                  (med) => ActionChip(
+                    label: Text(med.label),
+                    onPressed: () => _addMedicationWithDetails(med),
                   ),
                 )
-              else
-                ..._medications.map((med) {
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 4),
-                    child: Text(
-                      '• ${med['name']} - ${med['dose']} (${med['frequency']})',
-                      style: theme.textTheme.bodyMedium,
-                    ),
-                  );
-                }).toList(),
+                .toList(),
+          ),
+          const SizedBox(height: 12),
+        ],
+        if (matches.isNotEmpty) ...[
+          Text(
+            'Search results',
+            style: theme.textTheme.titleSmall
+                ?.copyWith(fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 8),
+          ...matches.take(8).map(
+                (m) => ListTile(
+                  leading: const Icon(Icons.medication_outlined),
+                  title: Text(m.label),
+                  subtitle: Text('Code: ${m.code}'),
+                  trailing: TextButton(
+                    onPressed: () => _addMedicationWithDetails(m),
+                    child: const Text('Add'),
+                  ),
+                ),
+              ),
+        ] else
+          Text(
+            'No matches. Try another spelling.',
+            style: theme.textTheme.bodySmall,
+          ),
+        const Divider(height: 24),
+        if (_medications.isNotEmpty)
+          ..._medications.map(
+            (med) => Card(
+              child: ListTile(
+                title: Text(med['name'] ?? ''),
+                subtitle: Text(
+                  [
+                    if (med['dose']?.isNotEmpty == true) med['dose'],
+                    if (med['frequency']?.isNotEmpty == true) med['frequency'],
+                    if (med['adherence']?.isNotEmpty == true) med['adherence'],
+                  ].whereType<String>().join(' • '),
+                ),
+                trailing: IconButton(
+                  icon: const Icon(Icons.delete_outline),
+                  onPressed: () {
+                    setState(() => _medications.remove(med));
+                  },
+                ),
+              ),
+            ),
+          )
+        else
+          Text(
+            'No medications added yet.',
+            style: theme.textTheme.bodySmall
+                ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+          ),
+        const Divider(height: 24),
+        SwitchListTile(
+          value: _takesSupplements,
+          title: const Text('Taking supplements or OTC'),
+          onChanged: (value) {
+            setState(() {
+              _takesSupplements = value;
+              if (!value) _supplements.clear();
+            });
+          },
+        ),
+        if (_takesSupplements) ...[
+          ..._supplements.map(
+            (supplement) => Card(
+              child: ListTile(
+                title: Text(supplement['name'] ?? ''),
+                subtitle: Text(
+                  [
+                    if (supplement['dose']?.isNotEmpty == true)
+                      supplement['dose'],
+                    if (supplement['frequency']?.isNotEmpty == true)
+                      supplement['frequency'],
+                    if (supplement['adherence']?.isNotEmpty == true)
+                      supplement['adherence'],
+                  ].whereType<String>().join(' • '),
+                ),
+                trailing: IconButton(
+                  icon: const Icon(Icons.delete_outline),
+                  onPressed: () {
+                    setState(() => _supplements.remove(supplement));
+                  },
+                ),
+              ),
+            ),
+          ),
+          TextButton.icon(
+            onPressed: _showSupplementDialog,
+            icon: const Icon(Icons.add),
+            label: const Text('Add supplement'),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _nutritionPage(ThemeData theme) {
+    return _sectionShell(
+      title: 'Nutrition & hydration',
+      subtitle:
+          'Daily patterns, restrictions, and intake signals used for baseline normalization.',
+      children: [
+        Form(
+          key: _nutritionFormKey,
+          child: Column(
+            children: [
+              DropdownButtonFormField<String>(
+              value: _dietPattern,
+              decoration:
+                  const InputDecoration(labelText: 'Primary diet pattern'),
+              items: _dietPatterns
+                  .map(
+                      (pattern) => DropdownMenuItem(
+                        value: pattern,
+                        child: Text(pattern),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (value) => setState(() => _dietPattern = value),
+                validator: (value) =>
+                    value == null ? 'Select a diet pattern' : null,
+              ),
+              if (_dietPattern == 'Other') ...[
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller: _otherDietController,
+                  decoration: const InputDecoration(
+                    labelText: 'Diet notes',
+                    hintText: 'Describe your approach',
+                  ),
+                  validator: (value) {
+                    if (_dietPattern == 'Other' &&
+                        (value == null || value.isEmpty)) {
+                      return 'Please describe your diet';
+                    }
+                    return null;
+                  },
+                ),
+              ],
+              const SizedBox(height: 12),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Wrap(
+                  spacing: 8,
+              runSpacing: 8,
+              children: _dietRestrictionOptions
+                  .map(_dietRestrictionChip)
+                  .toList(),
+            ),
+          ),
+          const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                value: _caffeineUse,
+                decoration:
+                    const InputDecoration(labelText: 'Caffeine per day'),
+                items: const [
+                  DropdownMenuItem(value: 'none', child: Text('None')),
+                  DropdownMenuItem(value: '1-2', child: Text('1-2 cups')),
+                  DropdownMenuItem(value: '3-5', child: Text('3-5 cups')),
+                  DropdownMenuItem(value: 'gt5', child: Text('More than 5')),
+                ],
+                onChanged: (value) => setState(() => _caffeineUse = value),
+                validator: (value) =>
+                    value == null ? 'Select caffeine intake' : null,
+              ),
+              const SizedBox(height: 12),
             ],
           ),
         ),
-      ),
-
-      const SizedBox(height: 24),
-
-      // Final continue button
-      FilledButton(
-        onPressed: _handleContinueToLifestyle,
-        child: const Text('Continue to lifestyle questions'),
-      ),
-    ];
+      ],
+    );
   }
 
-  List<Widget> _buildConditionsSummary(ThemeData theme) {
-    if (_conditions.contains('none')) {
-      return [
-        Text(
-          'No known conditions',
-          style: theme.textTheme.bodyMedium,
-        ),
-      ];
-    }
-
-    // Group conditions by category
-    final grouped = <String, List<String>>{};
-    for (final conditionValue in _conditions) {
-      for (final category in _conditionCategories) {
-        if (category.value == 'none') continue;
-        final conditions = _conditionsByCategory[category.value] ?? [];
-        final match = conditions.firstWhere(
-          (c) => c.value == conditionValue,
-          orElse: () => const _LabeledOption('', ''),
-        );
-        if (match.value.isNotEmpty) {
-          grouped.putIfAbsent(category.label, () => []);
-          grouped[category.label]!.add(match.label);
-          break;
-        }
-      }
-    }
-
-    final widgets = <Widget>[];
-    grouped.forEach((categoryLabel, conditionLabels) {
-      widgets.add(
-        Padding(
-          padding: const EdgeInsets.only(bottom: 8),
+  Widget _activityPage(ThemeData theme) {
+    return _sectionShell(
+      title: 'Weekly activity baseline',
+      subtitle:
+          'Capture a typical week: volume, intensity, constraints, and history to set your starting plan.',
+      children: [
+        Form(
+          key: _activityFormKey,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                categoryLabel,
-                style: theme.textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: theme.colorScheme.primary,
-                ),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Do you currently exercise?'),
+                value: (_activityFrequency ?? 0) > 0 || _activityIntensity != null,
+                onChanged: (value) {
+                  setState(() {
+                    if (!value) {
+                      _resetActivityInputs();
+                    } else {
+                      _activityFrequency ??= 1;
+                      _activityIntensity ??= 'light';
+                    }
+                  });
+                },
               ),
-              ...conditionLabels.map((label) => Padding(
-                padding: const EdgeInsets.only(left: 16, top: 2),
-                child: Text('• $label'),
-              )),
+              const SizedBox(height: 8),
+              if ((_activityFrequency ?? 0) > 0 || _activityIntensity != null) ...[
+                TextFormField(
+                  initialValue:
+                      _activityFrequency != null ? '$_activityFrequency' : null,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Intentional activity days per week',
+                  ),
+                  onChanged: (value) =>
+                      _activityFrequency = int.tryParse(value.trim()),
+                  validator: (value) {
+                    final parsed = int.tryParse(value ?? '');
+                    if (parsed == null || parsed < 0 || parsed > 21) {
+                      return 'Enter 0–21 days';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Breakdown by category',
+                  style: theme.textTheme.titleSmall
+                      ?.copyWith(fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 8),
+                ..._activityCategories.map(_activityCategoryCard),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  value: _activityIntensity,
+                  decoration:
+                      const InputDecoration(labelText: 'Overall intensity feel'),
+                  items: const [
+                    DropdownMenuItem(value: 'light', child: Text('Easy / light')),
+                    DropdownMenuItem(value: 'moderate', child: Text('Moderate')),
+                    DropdownMenuItem(value: 'vigorous', child: Text('Hard')),
+                  ],
+                  onChanged: (value) => setState(() => _activityIntensity = value),
+                  validator: (value) =>
+                      value == null ? 'Select intensity' : null,
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Context',
+                  style: theme.textTheme.titleSmall
+                      ?.copyWith(fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 8),
+                TextFormField(
+                  initialValue: _stepRange,
+                  decoration: const InputDecoration(
+                    labelText: 'Typical weekly steps (range)',
+                    hintText: 'e.g., 35k-50k (optional)',
+                  ),
+                  onChanged: (v) => _stepRange = v.trim().isEmpty ? null : v,
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  value: _jobActivity,
+                  decoration:
+                      const InputDecoration(labelText: 'Job activity level'),
+                  items: const [
+                    DropdownMenuItem(
+                        value: 'sedentary', child: Text('Mostly sitting')),
+                    DropdownMenuItem(
+                        value: 'mixed', child: Text('Mixed sitting/standing')),
+                    DropdownMenuItem(
+                        value: 'on_feet', child: Text('On feet most of day')),
+                  ],
+                  onChanged: (value) => setState(() => _jobActivity = value),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Equipment access',
+                  style: theme.textTheme.bodyMedium,
+                ),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: _equipmentOptions
+                      .map(
+                        (opt) => FilterChip(
+                          label: Text(opt),
+                          selected: _equipmentAccess.contains(opt),
+                          onSelected: (sel) {
+                            setState(() {
+                              sel
+                                  ? _equipmentAccess.add(opt)
+                                  : _equipmentAccess.remove(opt);
+                            });
+                          },
+                        ),
+                      )
+                      .toList(),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Limitations',
+                  style: theme.textTheme.bodyMedium,
+                ),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: _activityLimitationsOptions
+                      .map(_activityLimitationChip)
+                      .toList(),
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  value: _trainingHistory,
+                  decoration:
+                      const InputDecoration(labelText: 'Training history'),
+                  items: const [
+                    DropdownMenuItem(
+                        value: 'new', child: Text('New to exercise')),
+                    DropdownMenuItem(
+                        value: 'returning',
+                        child: Text('Returning after a break')),
+                    DropdownMenuItem(
+                        value: 'consistent',
+                        child: Text('Consistently active for months/years')),
+                  ],
+                  onChanged: (value) => setState(() => _trainingHistory = value),
+                ),
+              ],
             ],
           ),
         ),
+      ],
+    );
+  }
+
+  Widget _mentalPage(ThemeData theme) {
+    return _sectionShell(
+      title: 'Mental & cognitive health',
+      subtitle: 'Stress, mood, and cognitive load signals.',
+      children: [
+        Form(
+          key: _mentalFormKey,
+          child: Column(
+            children: [
+              DropdownButtonFormField<String>(
+                value: _stressLevel,
+                decoration: const InputDecoration(labelText: 'Stress level'),
+                items: const [
+                  DropdownMenuItem(value: 'low', child: Text('Low')),
+                  DropdownMenuItem(value: 'moderate', child: Text('Moderate')),
+                  DropdownMenuItem(value: 'high', child: Text('High')),
+                ],
+                onChanged: (value) => setState(() => _stressLevel = value),
+                validator: (value) =>
+                    value == null ? 'Select stress level' : null,
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                value: _mood,
+                decoration: const InputDecoration(labelText: 'Mood stability'),
+                items: const [
+                  DropdownMenuItem(value: 'stable', child: Text('Stable')),
+                  DropdownMenuItem(value: 'variable', child: Text('Variable')),
+                  DropdownMenuItem(value: 'low', child: Text('Low')),
+                ],
+                onChanged: (value) => setState(() => _mood = value),
+                validator: (value) =>
+                    value == null ? 'Select mood status' : null,
+              ),
+              const SizedBox(height: 12),
+              SwitchListTile(
+                value: _focusIssues,
+                title: const Text('Difficulty focusing'),
+                onChanged: (value) => setState(() => _focusIssues = value),
+              ),
+              SwitchListTile(
+                value: _burnout,
+                title: const Text('Burnout indicators present'),
+                onChanged: (value) => setState(() => _burnout = value),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _riskPage(ThemeData theme) {
+    return _sectionShell(
+      title: 'Risk factors',
+      subtitle:
+          'Behaviors and inherited risks recorded with this baseline for future safety checks.',
+      children: [
+        Form(
+          key: _riskFormKey,
+          child: Column(
+            children: [
+              DropdownButtonFormField<String>(
+                value: _smokingStatus,
+                decoration: const InputDecoration(labelText: 'Smoking'),
+                items: const [
+                  DropdownMenuItem(value: 'never', child: Text('Never')),
+                  DropdownMenuItem(value: 'former', child: Text('Former')),
+                  DropdownMenuItem(value: 'current', child: Text('Current')),
+                ],
+                onChanged: (value) => setState(() => _smokingStatus = value),
+                validator: (value) =>
+                    value == null ? 'Select smoking status' : null,
+              ),
+              if (_smokingStatus == 'current') ...[
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller: _smokingDetailsController,
+                  decoration: const InputDecoration(
+                    labelText: 'Daily usage or notes',
+                  ),
+                  validator: (value) {
+                    if (_smokingStatus == 'current' &&
+                        (value == null || value.isEmpty)) {
+                      return 'Add brief detail for risk calculations';
+                    }
+                    return null;
+                  },
+                ),
+              ],
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                value: _substanceUse,
+                decoration:
+                    const InputDecoration(labelText: 'Substance use'),
+                items: const [
+                  DropdownMenuItem(value: 'none', child: Text('None')),
+                  DropdownMenuItem(
+                      value: 'occasional', child: Text('Occasional')),
+                  DropdownMenuItem(value: 'regular', child: Text('Regular')),
+                ],
+                onChanged: (value) => setState(() => _substanceUse = value),
+                validator: (value) =>
+                    value == null ? 'Select substance use' : null,
+              ),
+              const SizedBox(height: 12),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: _cardioRiskOptions.map(_cardioRiskChip).toList(),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _reviewPage(ThemeData theme) {
+    final baseline = _buildBaselinePreview();
+    return _sectionShell(
+      title: 'Final review & confirmation',
+      subtitle:
+          'Confirm accuracy. Submitting saves this as your baseline snapshot; you can refresh it later by re-running intake.',
+      children: [
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: baseline
+                  .map(
+                    (entry) => Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Text('• $entry'),
+                    ),
+                  )
+                  .toList(),
+            ),
+          ),
+        ),
+        CheckboxListTile(
+          value: _consentGiven,
+          onChanged: (value) => setState(() => _consentGiven = value ?? false),
+          title: const Text(
+            'I confirm the above is accurate to use as my baseline snapshot.',
+          ),
+          controlAffinity: ListTileControlAffinity.leading,
+        ),
+        if (!_consentGiven)
+          _errorText(theme, 'Consent is required to finish the baseline.'),
+      ],
+    );
+  }
+
+  Widget _errorText(ThemeData theme, String text) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Padding(
+        padding: const EdgeInsets.only(top: 4),
+        child: Text(
+          text,
+          style:
+              theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.error),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _nextPage() async {
+    if (!_validateCurrentPage()) return;
+    await _persistDraft();
+    if (!mounted) return;
+    setState(() {
+      _pageIndex = (_pageIndex + 1).clamp(0, _totalPages - 1);
+    });
+  }
+
+  void _previousPage() {
+    setState(() {
+      _pageIndex = (_pageIndex - 1).clamp(0, _totalPages - 1);
+    });
+  }
+
+  bool _validateCurrentPage() {
+    switch (_pageIndex) {
+      case 0:
+        final valid = _demographicsFormKey.currentState?.validate() ?? false;
+        final heightCm = _useMetric ? _heightValue : _heightValue * 2.54;
+        final weightKg = _useMetric ? _weightValue : _weightValue * 0.45359237;
+        final heightRange = _heightRange(true);
+        final weightRange = _weightRange(true);
+        final heightValid =
+            heightCm >= heightRange.min && heightCm <= heightRange.max;
+        final weightValid =
+            weightKg >= weightRange.min && weightKg <= weightRange.max;
+        if (!heightValid || !weightValid) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Set realistic height and weight before continuing.'),
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+        return valid && heightValid && weightValid;
+      case 1:
+        const valid = true;
+        final hasCondition = _selectedConditions.isNotEmpty;
+        if (!hasCondition) {
+          setState(() {
+            _medicalValidationError =
+                'Select at least one condition to continue.';
+          });
+          return false;
+        }
+        _medicalValidationError = null;
+        return valid;
+      case 2:
+        // Medications are optional; if supplements are toggled on with no entries, turn the toggle off to avoid blocking progress.
+        if (_takesSupplements && _supplements.isEmpty) {
+          setState(() => _takesSupplements = false);
+        }
+        return true;
+      case 3:
+        return true; // Typical day optional
+      case 4:
+        return _nutritionFormKey.currentState?.validate() ?? false;
+      case 5:
+        return _activityFormKey.currentState?.validate() ?? false;
+      case 6:
+        return _mentalFormKey.currentState?.validate() ?? false;
+      case 7:
+        return _riskFormKey.currentState?.validate() ?? false;
+      case 8:
+      default:
+        return _consentGiven;
+    }
+  }
+
+  String? _medicalValidationError;
+
+  Future<void> _persistDraft() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    final answers = _buildAnswers(status: 'in_progress');
+    await HealthQuestionnaireService.saveAnswersForUser(user.uid, answers);
+  }
+
+  Future<void> _completeFlow() async {
+    if (!_validateCurrentPage()) return;
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    setState(() => _saving = true);
+    try {
+      final now = DateTime.now().toUtc();
+      final version = _baselineVersion ?? 'baseline-${now.toIso8601String()}';
+      final answers = _buildAnswers(
+        status: 'editable',
+        completedAt: now,
+        lockedAt: null,
+        baselineVersion: version,
       );
-    });
-
-    return widgets;
+      await HealthQuestionnaireService.saveAnswersForUser(user.uid, answers);
+      if (!mounted) return;
+      Navigator.of(context).pop(
+        HealthQuestionnaireResult(
+          answers: answers,
+          baselineVersion: version,
+          completedAt: now.toLocal(),
+          lockedAt: null,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _saving = false);
+      }
+    }
   }
 
-  // ===== NAVIGATION HELPERS =====
-  void _goToMedicationsPage() {
-    _logInteraction(
-      eventType: 'navigation',
-      field: 'conditionSubPage',
-      oldValue: _conditionSubPage,
-      newValue: 1,
-      metadata: {'page': 'medications'},
+  Map<String, dynamic> _buildAnswers({
+    required String status,
+    DateTime? completedAt,
+    DateTime? lockedAt,
+    String? baselineVersion,
+  }) {
+    final now = DateTime.now().toUtc();
+    final ageText = _ageController.text.trim();
+    final age = _dateOfBirth != null
+        ? _calculateAge(_dateOfBirth!)
+        : int.tryParse(ageText);
+    final height = _useMetric ? _heightValue : _heightValue * 2.54;
+    final weight = _useMetric ? _weightValue : _weightValue * 0.45359237;
+    final bmi =
+        height > 0 ? weight / ((height / 100) * (height / 100)) : null;
+    final stressScore = _stressScore(_stressLevel, _burnout);
+    final sleepScore = _sleepScore(_sleepHours, _sleepQuality);
+    final nutritionScore = _nutritionScore(
+      _dietPattern,
+      _dietRestrictionSelections,
+      _alcoholUse,
     );
-    setState(() {
-      _conditionSubPage = 1;
+    final emotionalScore = _emotionalScore(_mood, _focusIssues, _burnout);
+    final activityProfile = _buildActivityProfile();
+
+    final resolvedVersion =
+        baselineVersion ?? _baselineVersion ?? 'baseline-${now.toIso8601String()}';
+    _baselineVersion ??= resolvedVersion;
+    final versionHistory =
+        List<Map<String, dynamic>>.from(_initialAnswers?['versionHistory'] ?? []);
+    // Keep version history but do not lock the baseline
+    versionHistory.add({
+      'version': resolvedVersion,
+      'lockedAt': null,
     });
+
+    return {
+      'status': status,
+      'editable': true,
+      'lockState': 'unlocked',
+      'updatedAt': now.toIso8601String(),
+      'completedAt': completedAt?.toIso8601String(),
+      'lockedAt': lockedAt?.toIso8601String(),
+      'immutable': false,
+      'baselineVersion': resolvedVersion,
+      'lastSyncedAt': _initialAnswers?['lastSyncedAt'],
+      'progress': {'pageIndex': _pageIndex},
+      'versionHistory': versionHistory,
+      'baseline': {
+        'demographics': {
+          'fullName': _fullNameController.text.trim().isEmpty
+              ? null
+              : _fullNameController.text.trim(),
+          'dateOfBirth': _dateOfBirth?.toIso8601String(),
+          'age': age,
+          'sex': _sex,
+          'heightCm': height,
+          'weightKg': weight,
+          'bmi': bmi,
+          'country': _country,
+        },
+        'general': {}, // reserved for future general health signals
+        'medical': {
+          'conditions': _selectedConditions
+              .map((c) => {
+                    'label': c.label,
+                    'code': c.code,
+                    'isCurrent': c.isCurrent,
+                    'diagnosedYear': c.diagnosedYear?.trim().isEmpty == true
+                        ? null
+                        : c.diagnosedYear,
+                  })
+              .toList(),
+        },
+        'medications': {
+          'hasPrescriptions': _medications.isNotEmpty || _takesPrescriptions,
+          'hasSupplements': _takesSupplements,
+          'prescriptions': _medications,
+          'supplements': _supplements,
+        },
+        'sleep': {
+          'avgHours': _sleepHours,
+          'quality': _sleepQuality,
+          'disturbances': _sleepDisturbances.toList(),
+          'sleepDisorders': _sleepDisorders.toList(),
+          'canonical': {'sleep_score': sleepScore},
+        },
+        'nutrition': {
+          'dietPattern': _dietPattern,
+          'dietNote': _otherDietController.text.trim().isEmpty
+              ? null
+              : _otherDietController.text.trim(),
+          'restrictions': _dietRestrictionSelections.toList(),
+          'alcohol': _alcoholUse,
+          'caffeinePerDay': _caffeineUse,
+          'canonical': {'nutrition_score': nutritionScore},
+        },
+        'routine': {
+          'wakeUp': _wakeUpTime != null ? _format24h(_wakeUpTime!) : null,
+          'bedTime': _bedTime != null ? _format24h(_bedTime!) : null,
+          'dinnerTime': _dinnerTime != null ? _format24h(_dinnerTime!) : null,
+          'sleepQuality': _typicalSleepQuality,
+          'workShift': _workShift,
+          'breakfastHabit': _breakfastHabit,
+          'mealsPerDay': _mealsPerDay,
+        },
+        'activity': activityProfile,
+        'mental': {
+          'stress': _stressLevel,
+          'mood': _mood,
+          'focusIssues': _focusIssues,
+          'burnoutIndicators': _burnout,
+          'canonical': {
+            'stress_score': stressScore,
+            'emotional_score': emotionalScore,
+          },
+        },
+        'risks': {
+          'smokingStatus': _smokingStatus,
+          'substanceUse': _substanceUse,
+          'cardiometabolicRisks': [],
+          'riskNotes': _smokingDetailsController.text.trim(),
+        },
+        'finalReview': {
+          'consentAccepted': _consentGiven,
+          'version': resolvedVersion,
+          'lockedAt': lockedAt?.toIso8601String(),
+          'editable': true,
+        },
+      },
+    };
   }
 
-  void _goToReviewPage() {
-    _logInteraction(
-      eventType: 'navigation',
-      field: 'conditionSubPage',
-      oldValue: _conditionSubPage,
-      newValue: 2,
-      metadata: {'page': 'review'},
+  List<String> _buildBaselinePreview() {
+    final bmi = _computeBmi();
+    final age = _dateOfBirth != null ? _calculateAge(_dateOfBirth!) : null;
+    return [
+      if (_fullNameController.text.trim().isNotEmpty)
+        'Name ${_fullNameController.text.trim()}',
+      if (_dateOfBirth != null && _sex != null)
+        'DOB ${_formatDate(_dateOfBirth!)}, Age $age, $_sex',
+      if (_dateOfBirth == null &&
+          _ageController.text.isNotEmpty &&
+          _sex != null)
+        'Age ${_ageController.text}, $_sex',
+      if (_dateOfBirth == null &&
+          _ageController.text.isNotEmpty &&
+          _sex == null)
+        'Age ${_ageController.text}',
+      if (_country != null) 'Country: $_country',
+      'Height: ${_formatHeightLabel()}',
+      'Weight: ${_formatWeightLabel()}',
+      if (bmi != null) 'BMI ${bmi.toStringAsFixed(1)}',
+      if (_selectedConditions.isNotEmpty)
+        'Conditions: ${_selectedConditions.length} recorded',
+      if (_takesPrescriptions)
+        'Medications: ${_medications.length} listed',
+      if (_wakeUpTime != null)
+        'Wake-up: ${_timeLabel(_wakeUpTime)}',
+      if (_bedTime != null)
+        'Bedtime: ${_timeLabel(_bedTime)}',
+      if (_dinnerTime != null)
+        'Dinner: ${_timeLabel(_dinnerTime)}',
+      if (_typicalSleepQuality != null)
+        'Sleep quality: $_typicalSleepQuality',
+      if (_workShift != null) 'Work shift: $_workShift',
+      if (_breakfastHabit != null) 'Breakfast: $_breakfastHabit',
+      if (_mealsPerDay != null) 'Meals/day: $_mealsPerDay',
+      if (_sleepHours != null) 'Sleep: ${_sleepHours?.toStringAsFixed(1)}h',
+      if (_dietPattern != null) 'Diet: $_dietPattern',
+      if (_activityFrequency != null && _activityIntensity != null)
+        'Activity: $_activityFrequency/wk at $_activityIntensity intensity',
+      if (_stressLevel != null) 'Stress: $_stressLevel',
+      if (_smokingStatus != null) 'Smoking: $_smokingStatus',
+    ];
+  }
+
+  double? _computeBmi() {
+    final height = _useMetric ? _heightValue : _heightValue * 2.54;
+    final weight = _useMetric ? _weightValue : _weightValue * 0.45359237;
+    if (height == 0) return null;
+    return weight / ((height / 100) * (height / 100));
+  }
+
+  String _formatHeightLabel() {
+    if (_useMetric) {
+      return '${_heightValue.toStringAsFixed(0)} cm';
+    }
+    final inches = _heightValue;
+    final feet = (inches / 12).floor();
+    final remainingInches = (inches - feet * 12).round();
+    return "$feet'$remainingInches\"";
+  }
+
+  String _formatWeightLabel() {
+    if (_useMetric) {
+      return '${_weightValue.toStringAsFixed(1)} kg';
+    }
+    return '${_weightValue.toStringAsFixed(0)} lb';
+  }
+
+  ({double min, double max}) _heightRange(bool metric) =>
+      (min: metric ? 120.0 : 48.0, max: metric ? 250.0 : 98.0);
+
+  ({double min, double max}) _weightRange(bool metric) =>
+      (min: metric ? 30.0 : 66.0, max: metric ? 250.0 : 550.0);
+
+  double _clampHeight(double value, bool metric) {
+    final range = _heightRange(metric);
+    return value.clamp(range.min, range.max).toDouble();
+  }
+
+  double _clampWeight(double value, bool metric) {
+    final range = _weightRange(metric);
+    return value.clamp(range.min, range.max).toDouble();
+  }
+
+  String _format24h(TimeOfDay time) {
+    final hour = time.hour.toString().padLeft(2, '0');
+    final minute = time.minute.toString().padLeft(2, '0');
+    return '$hour:$minute';
+  }
+
+  int? _toInt(dynamic value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    if (value is String) return int.tryParse(value);
+    return null;
+  }
+
+  void _resetActivityInputs() {
+    _activityFrequency = 0;
+    _activityIntensity = null;
+    for (final entry in _categoryInputs.values) {
+      entry
+        ..daysPerWeek = null
+        ..minutesPerSession = null
+        ..intensity = null;
+    }
+    _stepRange = null;
+    _jobActivity = null;
+    _equipmentAccess.clear();
+    _activityLimitations.clear();
+    _trainingHistory = null;
+  }
+
+  int _estimateMetMinutes(int frequency, String? intensity) {
+    final intensityFactor = switch (intensity) {
+      'light' => 2.5,
+      'moderate' => 4.5,
+      'vigorous' => 8.0,
+      _ => 2.5,
+    };
+    final minutesPerSession = 30;
+    return (frequency * minutesPerSession * intensityFactor).round();
+  }
+
+  int _stressScore(String? stressLevel, bool burnout) {
+    int base = switch (stressLevel) {
+      'low' => 25,
+      'moderate' => 55,
+      'high' => 80,
+      _ => 50,
+    };
+    if (burnout) base += 10;
+    return base.clamp(0, 100);
+  }
+
+  int _sleepScore(double? hours, String? quality) {
+    if (hours == null || quality == null) return 50;
+    int base;
+    if (hours >= 7.5) {
+      base = 80;
+    } else if (hours >= 6) {
+      base = 60;
+    } else {
+      base = 35;
+    }
+    if (quality == 'restorative') base += 10;
+    if (quality == 'poor') base -= 15;
+    return base.clamp(0, 100);
+  }
+
+  int _nutritionScore(
+    String? dietPattern,
+    Set<String> restrictions,
+    String? alcohol,
+  ) {
+    int base = switch (dietPattern) {
+      'Mediterranean' => 80,
+      'Balanced' => 70,
+      'Plant-forward/vegetarian' => 70,
+      'High protein' => 65,
+      'Low carb' => 65,
+      'Other' => 60,
+      _ => 55,
+    };
+    if (alcohol == 'heavy') base -= 15;
+    if (alcohol == 'moderate') base -= 5;
+    if (restrictions.contains('None')) base += 0;
+    return base.clamp(0, 100);
+  }
+
+  Map<String, dynamic> _buildActivityProfile() {
+    final categories = <String, dynamic>{};
+    _categoryInputs.forEach((key, input) {
+      if (input.daysPerWeek == null &&
+          input.minutesPerSession == null &&
+          input.intensity == null) {
+        return;
+      }
+      categories[key] = {
+        'daysPerWeek': input.daysPerWeek,
+        'minutesPerSession': input.minutesPerSession,
+        'intensity': input.intensity,
+      };
+    });
+
+    // Rough starting plan: sum minutes across categories
+    int totalMinutes = 0;
+    for (final input in _categoryInputs.values) {
+      final days = input.daysPerWeek ?? 0;
+      final minutes = input.minutesPerSession ?? 0;
+      totalMinutes += days * minutes;
+    }
+    String startingLevel;
+    if (totalMinutes >= 180) {
+      startingLevel = 'high';
+    } else if (totalMinutes >= 90) {
+      startingLevel = 'moderate';
+    } else if (totalMinutes > 0) {
+      startingLevel = 'light';
+    } else {
+      startingLevel = 'none';
+    }
+
+    int progressionRate;
+    switch (startingLevel) {
+      case 'high':
+        progressionRate = 5;
+        break;
+      case 'moderate':
+        progressionRate = 10;
+        break;
+      case 'light':
+        progressionRate = 15;
+        break;
+      default:
+        progressionRate = 20;
+    }
+
+    return {
+      'frequencyPerWeek': _activityFrequency,
+      'intensity': _activityIntensity,
+      'categories': categories,
+      'stepRange': _stepRange,
+      'jobActivity': _jobActivity,
+      'equipment': _equipmentAccess.toList(),
+      'limitations': _activityLimitations.toList(),
+      'trainingHistory': _trainingHistory,
+      'canonical': {
+        'starting_minutes_per_week': totalMinutes,
+        'starting_level': startingLevel,
+        'progression_rate_percent': progressionRate,
+        'estimated_met_minutes':
+            _estimateMetMinutes(_activityFrequency ?? 0, _activityIntensity),
+      },
+    };
+  }
+
+  int _emotionalScore(String? mood, bool focusIssues, bool burnout) {
+    int base = switch (mood) {
+      'stable' => 75,
+      'variable' => 55,
+      'low' => 40,
+      _ => 50,
+    };
+    if (focusIssues) base -= 5;
+    if (burnout) base -= 10;
+    return base.clamp(0, 100);
+  }
+
+  String _timeLabel(TimeOfDay? time) {
+    if (time == null) return 'Not set';
+    final hour = time.hourOfPeriod == 0 ? 12 : time.hourOfPeriod;
+    final minute = time.minute.toString().padLeft(2, '0');
+    final period = time.period == DayPeriod.am ? 'AM' : 'PM';
+    return '$hour:$minute $period';
+  }
+
+  TimeOfDay? _parseTime(dynamic value) {
+    if (value is! String || value.isEmpty) return null;
+    final parts = value.split(':');
+    if (parts.length != 2) return null;
+    final hour = int.tryParse(parts[0]);
+    final minute = int.tryParse(parts[1]);
+    if (hour == null || minute == null) return null;
+    if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
+    return TimeOfDay(hour: hour, minute: minute);
+  }
+
+  Future<TimeOfDay?> _pickTime(TimeOfDay? initial) async {
+    final now = TimeOfDay.now();
+    return showTimePicker(
+      context: context,
+      initialTime: initial ?? now,
     );
-    setState(() {
-      _conditionSubPage = 2;
-    });
   }
 
-  // ===== MEDICATION DIALOG =====
-  Future<void> _showAddMedicationDialog() async {
-    final nameController = TextEditingController();
+  Widget _dietRestrictionChip(String label) {
+    final selected = _dietRestrictionSelections.contains(label);
+    return FilterChip(
+      label: Text(label),
+      selected: selected,
+      onSelected: (value) {
+        setState(() {
+          if (label == 'None') {
+            _dietRestrictionSelections = value ? {label} : <String>{};
+          } else {
+            _dietRestrictionSelections.remove('None');
+            value
+                ? _dietRestrictionSelections.add(label)
+                : _dietRestrictionSelections.remove(label);
+          }
+        });
+      },
+    );
+  }
+
+  Widget _activityLimitationChip(String label) {
+    final selected = _activityLimitations.contains(label);
+    return FilterChip(
+      label: Text(label),
+      selected: selected,
+      onSelected: (value) {
+        setState(() {
+          if (label == 'None') {
+            _activityLimitations = value ? {label} : <String>{};
+          } else {
+            _activityLimitations.remove('None');
+            value
+                ? _activityLimitations.add(label)
+                : _activityLimitations.remove(label);
+          }
+        });
+      },
+    );
+  }
+
+  Widget _cardioRiskChip(String label) {
+    final selected = _cardioRisks.contains(label);
+    return FilterChip(
+      label: Text(label),
+      selected: selected,
+      onSelected: (value) {
+        setState(() {
+          value
+              ? _cardioRisks.add(label)
+              : _cardioRisks.remove(label);
+        });
+      },
+    );
+  }
+
+  Widget _timePickerTile({
+    required String label,
+    required String value,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        width: 170,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: Theme.of(context)
+                  .textTheme
+                  .bodySmall
+                  ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+            ),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                const Icon(Icons.schedule, size: 16),
+                const SizedBox(width: 6),
+                Text(value),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _activityCategoryCard(_ActivityCategory category) {
+    final input = _categoryInputs[category.key] ??
+        _ActivityCategoryInput(key: category.key);
+    _categoryInputs[category.key] = input;
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              category.label,
+              style:
+                  Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              category.description,
+              style: Theme.of(context)
+                  .textTheme
+                  .bodySmall
+                  ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    initialValue:
+                        input.daysPerWeek != null ? '${input.daysPerWeek}' : null,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Days per week',
+                    ),
+                    onChanged: (v) =>
+                        input.daysPerWeek = int.tryParse(v.trim()),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextFormField(
+                    initialValue: input.minutesPerSession != null
+                        ? '${input.minutesPerSession}'
+                        : null,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Minutes per session',
+                    ),
+                    onChanged: (v) =>
+                        input.minutesPerSession = int.tryParse(v.trim()),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            DropdownButtonFormField<String>(
+              value: input.intensity,
+              decoration: const InputDecoration(labelText: 'How hard?'),
+              items: const [
+                DropdownMenuItem(value: 'light', child: Text('Easy')),
+                DropdownMenuItem(value: 'moderate', child: Text('Moderate')),
+                DropdownMenuItem(value: 'vigorous', child: Text('Hard')),
+              ],
+              onChanged: (v) => setState(() => input.intensity = v),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _addMedicationWithDetails(_MedicationOption option) async {
     final doseController = TextEditingController();
+    String adherence = 'Consistent';
     String frequency = 'Daily';
 
     final result = await showDialog<Map<String, String>>(
       context: context,
       builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              title: const Text('Add Medication'),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TextField(
-                      controller: nameController,
-                      decoration: const InputDecoration(
-                        labelText: 'Medication name',
-                        hintText: 'e.g., Metformin',
-                      ),
-                      textCapitalization: TextCapitalization.words,
-                    ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: doseController,
-                      decoration: const InputDecoration(
-                        labelText: 'Dose',
-                        hintText: 'e.g., 500mg',
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    DropdownButtonFormField<String>(
-                      value: frequency,
-                      decoration: const InputDecoration(
-                        labelText: 'Frequency',
-                      ),
-                      items: const [
-                        DropdownMenuItem(value: 'Daily', child: Text('Daily')),
-                        DropdownMenuItem(value: 'Twice daily', child: Text('Twice daily')),
-                        DropdownMenuItem(value: 'Three times daily', child: Text('Three times daily')),
-                        DropdownMenuItem(value: 'As needed', child: Text('As needed')),
-                        DropdownMenuItem(value: 'Weekly', child: Text('Weekly')),
-                        DropdownMenuItem(value: 'Other', child: Text('Other')),
-                      ],
-                      onChanged: (value) {
-                        if (value != null) {
-                          setDialogState(() {
-                            frequency = value;
-                          });
-                        }
-                      },
-                    ),
+        return AlertDialog(
+          title: Text(option.label),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: doseController,
+                  decoration: const InputDecoration(labelText: 'Dose'),
+                ),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String>(
+                  value: frequency,
+                  decoration: const InputDecoration(labelText: 'Frequency'),
+                  items: const [
+                    DropdownMenuItem(value: 'Daily', child: Text('Daily')),
+                    DropdownMenuItem(
+                        value: 'Twice daily', child: Text('Twice daily')),
+                    DropdownMenuItem(
+                        value: 'Three times daily',
+                        child: Text('Three times daily')),
+                    DropdownMenuItem(value: 'Weekly', child: Text('Weekly')),
+                    DropdownMenuItem(value: 'As needed', child: Text('As needed')),
                   ],
+                  onChanged: (value) => frequency = value ?? frequency,
                 ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Cancel'),
-                ),
-                FilledButton(
-                  onPressed: () {
-                    final name = nameController.text.trim();
-                    final dose = doseController.text.trim();
-                    if (name.isNotEmpty) {
-                      Navigator.pop(context, {
-                        'name': name,
-                        'dose': dose.isEmpty ? 'Not specified' : dose,
-                        'frequency': frequency,
-                      });
-                    }
-                  },
-                  child: const Text('Add'),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String>(
+                  value: adherence,
+                  decoration: const InputDecoration(labelText: 'Adherence'),
+                  items: const [
+                    DropdownMenuItem(
+                        value: 'Consistent', child: Text('Consistent')),
+                    DropdownMenuItem(
+                        value: 'Sometimes', child: Text('Sometimes')),
+                    DropdownMenuItem(value: 'Rarely', child: Text('Rarely')),
+                  ],
+                  onChanged: (value) => adherence = value ?? adherence,
                 ),
               ],
-            );
-          },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                Navigator.of(context).pop({
+                  'name': option.label,
+                  'code': option.code,
+                  'dose': doseController.text.trim(),
+                  'frequency': frequency,
+                  'adherence': adherence,
+                });
+              },
+              child: const Text('Add'),
+            ),
+          ],
         );
       },
     );
 
     if (result != null) {
-      _logInteraction(
-        eventType: 'selection',
-        field: 'medication',
-        oldValue: null,
-        newValue: result,
-        metadata: {
-          'action': 'add',
-          'medicationName': result['name'],
-          'dose': result['dose'],
-          'frequency': result['frequency'],
-        },
-      );
       setState(() {
         _medications.add(result);
+        _takesPrescriptions = true;
       });
-      _persistProfileDraft();
     }
   }
 
-  void _applyInitialAnswers() {
-    final data = widget.initialAnswers;
-    _draftAnswers = data != null
-        ? Map<String, dynamic>.from(data)
-        : <String, dynamic>{};
-    if (data == null) {
-      _refreshInitialValidity();
-      return;
-    }
+  Future<void> _showSupplementDialog() async {
+    final nameController = TextEditingController();
+    final doseController = TextEditingController();
+    String adherence = 'Consistent';
 
-    final name = data['fullName'] as String?;
-    if (name != null && name.trim().isNotEmpty) {
-      _nameController.text = name.trim();
-    }
-
-    final dobString = (data['dateOfBirth'] ?? data['dob'])?.toString();
-    final dob = dobString != null ? DateTime.tryParse(dobString) : null;
-    if (dob != null) {
-      _dob = dob;
-      _dobController.text = _formatDate(dob);
-    }
-
-    final gender = data['gender'] as String? ?? data['sexAtBirth'] as String?;
-    if (gender != null && gender.isNotEmpty) {
-      _gender = _migrateGender(gender);
-    }
-
-    final height = _castToDouble(data['heightCm'] ?? data['height']);
-    if (height != null) {
-      _heightController.text = _formatNumber(height);
-      _heightUnit = 'cm';
-    }
-
-    final weight = _castToDouble(data['weightKg'] ?? data['weight']);
-    if (weight != null) {
-      _weightController.text = _formatNumber(weight);
-      _weightUnit = 'kg';
-    }
-
-    final country = (data['countryCode'] ?? data['country']) as String?;
-    if (country != null && country.isNotEmpty) {
-      _countryCode = _migrateCountryCode(country);
-    }
-
-    final storedUnit = data['glucoseUnit'] as String?;
-    if (storedUnit != null && storedUnit.isNotEmpty) {
-      _glucoseUnit = storedUnit;
-    }
-
-    final region = _countryCode != null ? _findRegion(_countryCode!) : null;
-    if (region != null) {
-      _glucoseUnit = region.glucoseUnit;
-    }
-
-    final diabetesType = data['diabetesType'] as String?;
-    if (diabetesType != null && diabetesType.isNotEmpty) {
-      _diabetesType = _migrateDiabetesType(diabetesType);
-    }
-
-    final treatment =
-        data['treatment'] as String? ?? data['currentTreatment'] as String?;
-    if (treatment != null && treatment.isNotEmpty) {
-      _treatment = _migrateTherapy(treatment);
-    }
-
-    final conditionsRaw = data['conditions'];
-    if (conditionsRaw is List) {
-      _conditions
-        ..clear()
-        ..addAll(
-          conditionsRaw.map((e) => e.toString()).where((e) => e.isNotEmpty),
-        );
-    }
-
-    final medicationsRaw = data['medications'];
-    if (medicationsRaw is List) {
-      _medications.clear();
-      for (final med in medicationsRaw) {
-        if (med is Map) {
-          // New format: {name, dose, frequency}
-          _medications.add(Map<String, dynamic>.from(med));
-        } else if (med is String && med.isNotEmpty) {
-          // Old format: migrate string to map
-          _medications.add({
-            'name': _migrateMedication(med),
-            'dose': 'Not specified',
-            'frequency': 'Not specified',
-          });
-        }
-      }
-    }
-
-    final bmi = _castToDouble(data['bmi']);
-    if (bmi != null) {
-      _bmi = bmi;
-    }
-
-    final baseline = data['baseline'];
-    if (baseline is Map) {
-      final lifestyle = baseline['lifestyle'];
-      if (lifestyle is Map) {
-        _initialLifestyle = lifestyle.map(
-          (key, value) => MapEntry(key.toString(), value),
-        );
-      }
-      final activity = baseline['activity'];
-      if (activity is Map) {
-        final ipaq = activity['ipaq'];
-        final mapSource = ipaq is Map ? ipaq : activity;
-        _initialActivity = mapSource.map(
-          (key, value) => MapEntry(key.toString(), value),
-        );
-      }
-      final stress = baseline['stress'];
-      if (stress is Map) {
-        _initialStress = stress.map(
-          (key, value) => MapEntry(key.toString(), value),
-        );
-      }
-      final sleep = baseline['sleep'];
-      if (sleep is Map) {
-        _initialSleep = sleep.map(
-          (key, value) => MapEntry(key.toString(), value),
-        );
-      }
-      final nutrition = baseline['nutrition'];
-      if (nutrition is Map) {
-        _initialNutrition = nutrition.map(
-          (key, value) => MapEntry(key.toString(), value),
-        );
-      }
-      final psych = baseline['psych'];
-      if (psych is Map) {
-        _initialPsych = psych.map(
-          (key, value) => MapEntry(key.toString(), value),
-        );
-      }
-    }
-
-    // Refresh derived metrics to ensure BMI reflects current inputs.
-    _updateDerivedMetrics();
-    _refreshInitialValidity();
-  }
-
-  /// Migrates old gender/sex values to new canonical values
-  String _migrateGender(String oldValue) {
-    const migration = {
-      'non_binary': 'other',
-      'prefer_not_to_say': 'other',
-    };
-    return migration[oldValue] ?? oldValue;
-  }
-
-  /// Migrates old diabetes type values to new canonical values
-  String _migrateDiabetesType(String oldValue) {
-    const migration = {
-      'type1': 'T1D',
-      'type2': 'T2D',
-      'prediabetes': 'Prediabetes',
-      'monitoring_only': 'Monitoring',
-    };
-    return migration[oldValue] ?? oldValue;
-  }
-
-  /// Migrates old therapy/treatment values to new canonical values
-  String _migrateTherapy(String oldValue) {
-    const migration = {
-      'mdi': 'MDI',
-      'pump': 'Pump',
-      'non_insulin_medication': 'NonInsulin',
-      'diet_exercise': 'DietExercise',
-      'none': 'None',
-    };
-    return migration[oldValue] ?? oldValue;
-  }
-
-  /// Migrates old medication values to new canonical values
-  String _migrateMedication(String oldValue) {
-    const migration = {
-      'basal_insulin': 'basal_ins',
-      'bolus_insulin': 'bolus_ins',
-    };
-    return migration[oldValue] ?? oldValue;
-  }
-
-  // ========== INTERACTION LOGGING ==========
-
-  /// Logs a user interaction with timestamp and context
-  void _logInteraction({
-    required String eventType,
-    required String field,
-    dynamic oldValue,
-    dynamic newValue,
-    Map<String, dynamic>? metadata,
-  }) {
-    _interactionLog.add({
-      'timestamp': DateTime.now().toIso8601String(),
-      'eventType': eventType, // 'field_change', 'selection', 'navigation', 'search', etc.
-      'field': field,
-      'oldValue': oldValue,
-      'newValue': newValue,
-      'section': _getSectionName(),
-      'subPage': _conditionSubPage,
-      ...?metadata,
-    });
-    _persistInteractionLog();
-  }
-
-  /// Gets the current section name for logging context
-  String _getSectionName() {
-    if (_currentProfileSection == 0) {
-      return 'basic_info';
-    } else if (_currentProfileSection == 1) {
-      if (_conditionSubPage == 0) return 'conditions';
-      if (_conditionSubPage == 1) return 'medications';
-      if (_conditionSubPage == 2) return 'review';
-      return 'health_conditions';
-    }
-    return 'unknown';
-  }
-
-  /// Loads interaction log from SharedPreferences
-  Future<void> _loadInteractionLog() async {
-    final prefs = await SharedPreferences.getInstance();
-    final userId = FirebaseAuth.instance.currentUser?.uid;
-    if (userId == null) return;
-
-    final key = 'health_questionnaire_interaction_log_$userId';
-    final jsonString = prefs.getString(key);
-    if (jsonString != null && jsonString.isNotEmpty) {
-      try {
-        final decoded = jsonDecode(jsonString);
-        if (decoded is List) {
-          _interactionLog.clear();
-          _interactionLog.addAll(
-            decoded.map((e) => Map<String, dynamic>.from(e as Map)),
-          );
-        }
-      } catch (e) {
-        debugPrint('Error loading interaction log: $e');
-      }
-    }
-  }
-
-  /// Persists interaction log to SharedPreferences
-  Future<void> _persistInteractionLog() async {
-    final prefs = await SharedPreferences.getInstance();
-    final userId = FirebaseAuth.instance.currentUser?.uid;
-    if (userId == null) return;
-
-    final key = 'health_questionnaire_interaction_log_$userId';
-    try {
-      final jsonString = jsonEncode(_interactionLog);
-      await prefs.setString(key, jsonString);
-    } catch (e) {
-      debugPrint('Error persisting interaction log: $e');
-    }
-  }
-
-  // ========== END INTERACTION LOGGING ==========
-
-  Future<void> _pickDateOfBirth() async {
-    final now = DateTime.now();
-    final initialDate = _dob ?? DateTime(now.year - 25, now.month, now.day);
-    final oldDob = _dob;
-    final DateTime? picked = await showDatePicker(
+    final result = await showDialog<Map<String, String>>(
       context: context,
-      initialDate: initialDate,
-      firstDate: DateTime(now.year - 120),
-      lastDate: now,
-    );
-    if (picked != null) {
-      _logInteraction(
-        eventType: 'field_change',
-        field: 'dateOfBirth',
-        oldValue: oldDob?.toIso8601String(),
-        newValue: picked.toIso8601String(),
-      );
-      setState(() {
-        _dob = picked;
-        _dobController.text = _formatDate(picked);
-      });
-      _validateFormField(_FieldId.dob, _dobFieldKey);
-      _persistProfileDraft(); // Auto-save on date selection
-    }
-  }
-
-  Future<void> _goToSection3() async {
-    // Validate section 1 fields before proceeding
-    FocusScope.of(context).unfocus();
-    final formValid = _formKey.currentState?.validate() ?? false;
-
-    if (!formValid) {
-      return;
-    }
-
-    // Save draft before moving to next section
-    await _persistProfileDraft();
-
-    if (!mounted) return;
-
-    setState(() {
-      _currentProfileSection = 1;
-    });
-  }
-
-  Future<void> _goBackToSection2() async{
-    // Save draft before going back
-    await _persistProfileDraft();
-
-    if (!mounted) return;
-
-    setState(() {
-      _currentProfileSection = 0;
-    });
-  }
-
-  Future<void> _handleSubmit() async {
-    // Validate all required fields
-    FocusScope.of(context).unfocus();
-    final formValid = _formKey.currentState?.validate() ?? false;
-    final selectionsValid = _conditions.isNotEmpty;
-
-    if (!selectionsValid) {
-      setState(() => _showSelectionErrors = true);
-    }
-
-    if (!formValid || !selectionsValid) {
-      // Scroll to top to show validation errors
-      return;
-    }
-
-    if (_dob == null || _gender == null || _countryCode == null) {
-      return;
-    }
-
-    setState(() => _showSelectionErrors = false);
-
-    // Complete the questionnaire with basic data
-    await _finalizeBasicQuestionnaire();
-  }
-
-  double? _parseHeightToCm() {
-    final parsed = _parsePositiveNumber(_heightController.text);
-    if (parsed == null) return null;
-    return _heightUnit == 'cm' ? parsed : parsed * 2.54;
-  }
-
-  double? _parseWeightToKg() {
-    final parsed = _parsePositiveNumber(_weightController.text);
-    if (parsed == null) return null;
-    return _weightUnit == 'kg' ? parsed : parsed * 0.45359237;
-  }
-
-  Future<void> _finalizeBasicQuestionnaire() async {
-    // Save all profile data
-    final heightCm = _parseHeightToCm();
-    final weightKg = _parseWeightToKg();
-
-    if (heightCm == null || weightKg == null) {
-      return;
-    }
-
-    final result = HealthQuestionnaireResult(
-      fullName: _nameController.text.trim(),
-      dateOfBirth: _dob!,
-      gender: _gender!,
-      heightCm: heightCm,
-      weightKg: weightKg,
-      countryCode: _countryCode!,
-      glucoseUnit: _glucoseUnit,
-      conditions: _conditions.toList(),
-      bmi: _bmi,
-      baselineLifestyle: _initialLifestyle ?? {},
-      baselineActivity: _initialActivity ?? {},
-      baselineStress: _initialStress ?? {},
-      baselineSleep: _initialSleep ?? {},
-      baselineNutrition: _initialNutrition ?? {},
-      baselinePsych: _initialPsych ?? {},
-      completedAt: DateTime.now(),
-      updatedAt: DateTime.now(),
-      lastSyncedAt: null,
-      answers: _draftAnswers,
-    );
-
-    if (!mounted) return;
-    Navigator.of(context).pop(result);
-  }
-
-  Future<void> _handleContinueToLifestyle() async {
-    // Validate section 3 before proceeding to next questionnaire
-    FocusScope.of(context).unfocus();
-    final selectionsValid = _conditions.isNotEmpty;
-
-    if (!selectionsValid) {
-      setState(() => _showSelectionErrors = true);
-      return;
-    }
-
-    setState(() => _showSelectionErrors = false);
-
-    // Now call the original _handleContinue logic
-    await _handleContinue();
-  }
-
-  Future<void> _handleContinue() async {
-    FocusScope.of(context).unfocus();
-    final formValid = _formKey.currentState?.validate() ?? false;
-    final selectionsValid = _conditions.isNotEmpty;
-
-    if (!selectionsValid) {
-      setState(() => _showSelectionErrors = true);
-    }
-
-    if (!formValid || !selectionsValid) {
-      return;
-    }
-    if (_dob == null) {
-      return;
-    }
-    if (_gender == null) {
-      return;
-    }
-    if (_countryCode == null) {
-      return;
-    }
-    setState(() => _showSelectionErrors = false);
-
-    final flowResult = await Navigator.of(context).push<_LifestyleFlowResult>(
-      _buildHealthQuestionnaireRoute(
-        page: _LifestyleQuestionnairePage(
-          initialAnswers: _initialLifestyle,
-          initialActivityAnswers: _initialActivity,
-          initialStressAnswers: _initialStress,
-          initialSleepAnswers: _initialSleep,
-          initialNutritionAnswers: _initialNutrition,
-          initialPsychAnswers: _initialPsych,
-          onLifestyleSaved: _saveLifestyleDraft,
-          onActivitySaved: _saveActivityDraft,
-          onStressSleepSaved: _saveStressSleepDraft,
-          onNutritionSaved: _saveNutritionDraft,
-          onPsychSaved: _savePsychDraft,
-        ),
-        fullscreenDialog: true,
-      ),
-    );
-
-    if (!mounted || flowResult == null) {
-      return;
-    }
-
-    await _finalizeQuestionnaire(flowResult);
-  }
-
-  Future<void> _saveLifestyleDraft(Map<String, dynamic> lifestyle) async {
-    final copy = Map<String, dynamic>.from(lifestyle);
-    _initialLifestyle = copy;
-    await _persistBaselineDraft(lifestyle: copy);
-  }
-
-  Future<void> _saveActivityDraft(Map<String, dynamic> activity) async {
-    final activityCopy = Map<String, dynamic>.from(activity);
-    _initialActivity = activityCopy;
-    final container = <String, dynamic>{
-      'ipaq': Map<String, dynamic>.from(activityCopy),
-    };
-    await _persistBaselineDraft(activity: container);
-  }
-
-  Future<void> _saveStressSleepDraft(
-    Map<String, dynamic> stress,
-    Map<String, dynamic> sleep,
-  ) async {
-    final stressCopy = Map<String, dynamic>.from(stress);
-    final sleepCopy = Map<String, dynamic>.from(sleep);
-    _initialStress = stressCopy;
-    _initialSleep = sleepCopy;
-    await _persistBaselineDraft(
-      stress: stressCopy,
-      sleep: sleepCopy,
-    );
-  }
-
-  Future<void> _saveNutritionDraft(Map<String, dynamic> nutrition) async {
-    final nutritionCopy = Map<String, dynamic>.from(nutrition);
-    _initialNutrition = nutritionCopy;
-    await _persistBaselineDraft(nutrition: nutritionCopy);
-  }
-
-  Future<void> _savePsychDraft(Map<String, dynamic> psych) async {
-    final psychCopy = Map<String, dynamic>.from(psych);
-    _initialPsych = psychCopy;
-    await _persistBaselineDraft(psych: psychCopy);
-  }
-
-  Future<void> _persistBaselineDraft({
-    Map<String, dynamic>? lifestyle,
-    Map<String, dynamic>? activity,
-    Map<String, dynamic>? stress,
-    Map<String, dynamic>? sleep,
-    Map<String, dynamic>? nutrition,
-    Map<String, dynamic>? psych,
-  }) async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      return;
-    }
-    final updated = Map<String, dynamic>.from(_draftAnswers);
-    final baselineRaw = updated['baseline'];
-    final baseline = baselineRaw is Map<String, dynamic>
-        ? Map<String, dynamic>.from(baselineRaw)
-        : <String, dynamic>{};
-
-    void writeSection(String key, Map<String, dynamic>? value) {
-      if (value != null) {
-        baseline[key] = Map<String, dynamic>.from(value);
-      }
-    }
-
-    writeSection('lifestyle', lifestyle);
-    writeSection('activity', activity);
-    writeSection('stress', stress);
-    writeSection('sleep', sleep);
-    writeSection('nutrition', nutrition);
-    writeSection('psych', psych);
-
-    updated['baseline'] = baseline;
-
-    if (nutrition != null || psych != null) {
-      final metricsRaw = updated['metrics'];
-      final metrics = metricsRaw is Map<String, dynamic>
-          ? Map<String, dynamic>.from(metricsRaw)
-          : <String, dynamic>{};
-      if (nutrition != null && nutrition['index'] != null) {
-        metrics['nutrition'] = {'index': nutrition['index']};
-      }
-      if (psych != null && psych['index'] != null) {
-        metrics['psych'] = {'index': psych['index']};
-      }
-      updated['metrics'] = metrics;
-    }
-
-    updated['updatedAt'] = DateTime.now().toIso8601String();
-    _draftAnswers = updated;
-
-    await HealthQuestionnaireService.saveAnswersForUser(
-      user.uid,
-      Map<String, dynamic>.from(updated),
-    );
-  }
-
-  Future<void> _persistProfileDraft() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      return;
-    }
-
-    final heightValue = _parsePositiveNumber(_heightController.text);
-    final weightValue = _parsePositiveNumber(_weightController.text);
-    final heightCm = heightValue != null && _heightUnit == 'cm'
-        ? heightValue
-        : heightValue != null
-            ? heightValue * 2.54
-            : null;
-    final weightKg = weightValue != null && _weightUnit == 'kg'
-        ? weightValue
-        : weightValue != null
-            ? weightValue * 0.45359237
-            : null;
-
-    final updated = Map<String, dynamic>.from(_draftAnswers);
-
-    // Save all profile fields that have been filled in
-    if (_nameController.text.trim().isNotEmpty) {
-      updated['fullName'] = _nameController.text.trim();
-    }
-    if (_dob != null) {
-      updated['dateOfBirth'] = _dob!.toIso8601String();
-    }
-    if (_gender != null) {
-      updated['gender'] = _gender;
-    }
-    if (heightCm != null) {
-      updated['heightCm'] = heightCm;
-    }
-    if (weightKg != null) {
-      updated['weightKg'] = weightKg;
-    }
-    if (_countryCode != null) {
-      updated['countryCode'] = _countryCode;
-    }
-    if (_glucoseUnit.isNotEmpty) {
-      updated['glucoseUnit'] = _glucoseUnit;
-    }
-    if (_conditions.isNotEmpty) {
-      updated['conditions'] = _conditions.toList();
-    }
-    if (_bmi != null) {
-      updated['bmi'] = _bmi;
-    }
-
-    updated['updatedAt'] = DateTime.now().toIso8601String();
-    _draftAnswers = updated;
-
-    await HealthQuestionnaireService.saveAnswersForUser(
-      user.uid,
-      Map<String, dynamic>.from(updated),
-    );
-  }
-
-  Future<void> _finalizeQuestionnaire(_LifestyleFlowResult flow) async {
-    FocusScope.of(context).unfocus();
-
-    final lifestyle = flow.lifestyle;
-    final activity = flow.activity;
-    final stressSleep = flow.stressSleep;
-
-    final heightValue = _parsePositiveNumber(_heightController.text)!;
-    final weightValue = _parsePositiveNumber(_weightController.text)!;
-    final heightCm = _heightUnit == 'cm' ? heightValue : heightValue * 2.54;
-    final weightKg = _weightUnit == 'kg'
-        ? weightValue
-        : weightValue * 0.45359237;
-    final bmi = _computeBmi(heightCm, weightKg);
-
-    final nowIso = DateTime.now().toIso8601String();
-    final existingCompletedAt = widget.initialAnswers?['completedAt']
-        ?.toString();
-    final existingSyncedAt = widget.initialAnswers?['lastSyncedAt']?.toString();
-
-    // Calculate age from date of birth
-    final today = DateTime.now();
-    final age = today.year -
-        _dob!.year -
-        (today.month > _dob!.month ||
-                (today.month == _dob!.month && today.day >= _dob!.day)
-            ? 0
-            : 1);
-
-    final answers = <String, dynamic>{
-      'fullName': _nameController.text.trim(),
-      'dateOfBirth': _dob!.toIso8601String(),
-      'gender': _gender,
-      'heightCm': heightCm,
-      'weightKg': weightKg,
-      'bmi': bmi,
-      'countryCode': _countryCode,
-      'glucoseUnit': _glucoseUnit,
-      'conditions': _conditions.toList(),
-      'medications': _medications.map((m) => Map<String, dynamic>.from(m)).toList(),
-      'completedAt': existingCompletedAt ?? nowIso,
-      'updatedAt': nowIso,
-      // Canonical keys from data dictionary
-      'profile': {
-        'age_years': age,
-        'sex_at_birth': _gender,
-        'height_cm': heightCm,
-        'weight_kg': weightKg,
-        'bmi': bmi,
-        'region': _countryCode,
-        'comorbidities': _conditions.toList(),
-      },
-    };
-
-    if (existingSyncedAt != null) {
-      answers['lastSyncedAt'] = existingSyncedAt;
-    }
-
-    final lifestyleMap = lifestyle.toMap();
-    final activityMap = activity.toMap();
-    final activityContainer = {'ipaq': activityMap};
-    final stressMap = stressSleep.toStressMap();
-    final sleepMap = stressSleep.toSleepMap();
-    stressMap['loadIndex'] = stressSleep.stressLoad;
-    final nutritionMap = stressSleep.toNutritionMap();
-    final psychMap = stressSleep.toPsychMap();
-    answers['baseline'] = {
-      'lifestyle': lifestyleMap,
-      'activity': activityContainer,
-      'stress': stressMap,
-      'sleep': sleepMap,
-      'nutrition': nutritionMap,
-      'psych': psychMap,
-    };
-
-    final metrics = <String, dynamic>{};
-    final existingMetrics = widget.initialAnswers?['metrics'];
-    if (existingMetrics is Map) {
-      existingMetrics.forEach((key, value) {
-        metrics[key.toString()] = value;
-      });
-    }
-    metrics['nutrition'] = {'index': nutritionMap['index']};
-    metrics['psych'] = {'index': psychMap['index']};
-    answers['metrics'] = metrics;
-
-    final flags = <String, dynamic>{};
-    final existingFlags = widget.initialAnswers?['flags'];
-    if (existingFlags is Map) {
-      existingFlags.forEach((key, value) {
-        flags[key.toString()] = value;
-      });
-    }
-    final supportNeeded = psychMap['supportNeeded'] == true;
-    if (supportNeeded) {
-      flags['support_needed'] = true;
-    }
-    if (flags.isNotEmpty) {
-      answers['flags'] = flags;
-    }
-
-    final profile = <String, dynamic>{
-      'basic': {
-        'fullName': answers['fullName'],
-        'dateOfBirth': answers['dateOfBirth'],
-        'gender': answers['gender'],
-      },
-      'measurements': {
-        'heightCm': answers['heightCm'],
-        'weightKg': answers['weightKg'],
-        'bmi': answers['bmi'],
-        'countryCode': answers['countryCode'],
-        'glucoseUnit': answers['glucoseUnit'],
-      },
-      'management': {
-        'conditions': answers['conditions'],
-      },
-      'baseline': {
-        'lifestyle': lifestyleMap,
-        'activity': activityContainer,
-        'stress': stressMap,
-        'sleep': sleepMap,
-        'nutrition': nutritionMap,
-        'psych': psychMap,
-      },
-    };
-    answers['profile'] = profile;
-
-    _draftAnswers = Map<String, dynamic>.from(answers);
-    _initialLifestyle = lifestyleMap;
-    _initialActivity = activityMap;
-    _initialStress = stressMap;
-    _initialSleep = sleepMap;
-    _initialNutrition = nutritionMap;
-    _initialPsych = psychMap;
-
-    final completedAt =
-        DateTime.tryParse(answers['completedAt'] as String? ?? nowIso) ??
-        DateTime.now();
-    final updatedAt =
-        DateTime.tryParse(answers['updatedAt'] as String? ?? nowIso) ??
-        DateTime.now();
-    final lastSyncedAt = existingSyncedAt != null
-        ? DateTime.tryParse(existingSyncedAt)
-        : null;
-
-    final result = HealthQuestionnaireResult(
-      fullName: answers['fullName'] as String,
-      dateOfBirth: _dob!,
-      gender: _gender!,
-      heightCm: heightCm,
-      weightKg: weightKg,
-      countryCode: _countryCode!,
-      glucoseUnit: _glucoseUnit,
-      conditions: List<String>.from(answers['conditions'] as List),
-      bmi: bmi,
-      baselineLifestyle: lifestyleMap,
-      baselineActivity: activityMap,
-      baselineStress: stressMap,
-      baselineSleep: sleepMap,
-      baselineNutrition: nutritionMap,
-      baselinePsych: psychMap,
-      completedAt: completedAt,
-      updatedAt: updatedAt,
-      lastSyncedAt: lastSyncedAt,
-      answers: answers,
-    );
-
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('glucoseUnit', _glucoseUnit);
-
-    if (!mounted) return;
-    Navigator.of(context).pop(result);
-  }
-
-  void _changeHeightUnit(String newUnit) {
-    if (newUnit == _heightUnit) return;
-    _invalidateField(_FieldId.height);
-    final previousUnit = _heightUnit;
-    final currentValue = _parsePositiveNumber(_heightController.text);
-    setState(() {
-      _heightUnit = newUnit;
-    });
-    if (currentValue != null) {
-      double converted = currentValue;
-      if (previousUnit == 'cm' && newUnit == 'in') {
-        converted = currentValue / 2.54;
-      } else if (previousUnit == 'in' && newUnit == 'cm') {
-        converted = currentValue * 2.54;
-      }
-      _heightController.text = _formatNumber(converted);
-      _validateFormField(_FieldId.height, _heightFieldKey);
-    }
-  }
-
-  void _changeWeightUnit(String newUnit) {
-    if (newUnit == _weightUnit) return;
-    _invalidateField(_FieldId.weight);
-    final previousUnit = _weightUnit;
-    final currentValue = _parsePositiveNumber(_weightController.text);
-    setState(() {
-      _weightUnit = newUnit;
-    });
-    if (currentValue != null) {
-      double converted = currentValue;
-      if (previousUnit == 'kg' && newUnit == 'lb') {
-        converted = currentValue / 0.45359237;
-      } else if (previousUnit == 'lb' && newUnit == 'kg') {
-        converted = currentValue * 0.45359237;
-      }
-      _weightController.text = _formatNumber(converted);
-      _validateFormField(_FieldId.weight, _weightFieldKey);
-    }
-  }
-
-  void _selectCountry(String? code) {
-    if (code == null) return;
-    final oldCountryCode = _countryCode;
-    final oldGlucoseUnit = _glucoseUnit;
-    final region = _findRegion(code);
-    _logInteraction(
-      eventType: 'selection',
-      field: 'countryCode',
-      oldValue: oldCountryCode,
-      newValue: code,
-    );
-    setState(() {
-      _countryCode = code;
-      if (region != null) {
-        _glucoseUnit = region.glucoseUnit;
-      }
-    });
-    // Log glucose unit change if it changed
-    if (_glucoseUnit != oldGlucoseUnit) {
-      _logInteraction(
-        eventType: 'field_change',
-        field: 'glucoseUnit',
-        oldValue: oldGlucoseUnit,
-        newValue: _glucoseUnit,
-        metadata: {'triggeredBy': 'countrySelection'},
-      );
-    }
-    _validateDropdownField(_FieldId.country, _countryFieldKey);
-    _persistProfileDraft(); // Auto-save on country selection
-  }
-
-  void _updateDerivedMetrics() {
-    if (!mounted) return;
-    final heightValue = _parsePositiveNumber(_heightController.text);
-    final weightValue = _parsePositiveNumber(_weightController.text);
-
-    if (heightValue == null || weightValue == null) {
-      if (_bmi != null) {
-        setState(() => _bmi = null);
-      }
-      return;
-    }
-
-    final heightCm = _heightUnit == 'cm' ? heightValue : heightValue * 2.54;
-    final weightKg = _weightUnit == 'kg'
-        ? weightValue
-        : weightValue * 0.45359237;
-    final bmi = _computeBmi(heightCm, weightKg);
-    if ((_bmi == null && bmi != null) ||
-        (_bmi != null && bmi == null) ||
-        (_bmi != null && bmi != null && (bmi - _bmi!).abs() > 0.001)) {
-      setState(() => _bmi = bmi);
-    }
-  }
-
-  static double? _parsePositiveNumber(String? value) {
-    if (value == null) return null;
-    final cleaned = value.replaceAll(',', '.').trim();
-    if (cleaned.isEmpty) return null;
-    final parsed = double.tryParse(cleaned);
-    if (parsed == null || parsed <= 0) return null;
-    return parsed;
-  }
-
-  static double? _castToDouble(dynamic value) {
-    if (value == null) return null;
-    if (value is num) return value.toDouble();
-    if (value is String) return double.tryParse(value);
-    return null;
-  }
-
-  static double? _computeBmi(double heightCm, double weightKg) {
-    if (heightCm <= 0) return null;
-    final heightMeters = heightCm / 100;
-    if (heightMeters <= 0) return null;
-    final bmi = weightKg / (heightMeters * heightMeters);
-    if (bmi.isNaN || bmi.isInfinite) return null;
-    return bmi;
-  }
-
-  static int _calculateAge(DateTime dob) {
-    final now = DateTime.now();
-    int age = now.year - dob.year;
-    final hasHadBirthdayThisYear =
-        (now.month > dob.month) ||
-        (now.month == dob.month && now.day >= dob.day);
-    if (!hasHadBirthdayThisYear) {
-      age -= 1;
-    }
-    return age;
-  }
-
-  static String _formatDate(DateTime date) {
-    final month = date.month.toString().padLeft(2, '0');
-    final day = date.day.toString().padLeft(2, '0');
-    return '${date.year}-$month-$day';
-  }
-
-  static String _formatNumber(double value) {
-    return value.toStringAsFixed(value % 1 == 0 ? 0 : 1);
-  }
-
-  static _RegionOption? _findRegion(String code) {
-    // Migrate old country codes to new ones
-    final migratedCode = _migrateCountryCode(code);
-
-    for (final region in _regionOptions) {
-      if (region.code == migratedCode) {
-        return region;
-      }
-    }
-    return null;
-  }
-
-  static String _migrateCountryCode(String oldCode) {
-    const migration = {
-      'UK': 'GB',  // United Kingdom
-      'EU': 'DE',  // European Union -> Germany as default
-    };
-    return migration[oldCode] ?? oldCode;
-  }
-}
-
-class _LifestyleAnswers {
-  const _LifestyleAnswers({
-    required this.wakeUpTime,
-    required this.bedtime,
-    required this.sleepDurationHours,
-    required this.sleepQuality,
-    required this.workPattern,
-    required this.breakfastHabit,
-    required this.mealsPerDay,
-    required this.dinnerTime,
-    required this.caffeineIntake,
-    required this.alcoholConsumption,
-    required this.smokingStatus,
-    required this.energyLevel,
-  });
-
-  final TimeOfDay wakeUpTime;
-  final TimeOfDay bedtime;
-  final double sleepDurationHours;
-  final int sleepQuality;
-  final String workPattern;
-  final String breakfastHabit;
-  final int mealsPerDay;
-  final TimeOfDay dinnerTime;
-  final String caffeineIntake;
-  final String alcoholConsumption;
-  final String smokingStatus;
-  final String energyLevel;
-
-  Map<String, dynamic> toMap() {
-    return {
-      // Legacy keys (for backward compatibility)
-      'wakeUpTime': _formatTimeOfDay(wakeUpTime),
-      'bedtime': _formatTimeOfDay(bedtime),
-      'sleepDurationHours': sleepDurationHours,
-      'sleepQuality': sleepQuality,
-      'workPattern': workPattern,
-      'breakfastHabit': breakfastHabit,
-      'mealsPerDay': mealsPerDay,
-      'dinnerTime': _formatTimeOfDay(dinnerTime),
-      'caffeineIntake': caffeineIntake,
-      'alcoholConsumption': alcoholConsumption,
-      'smokingStatus': smokingStatus,
-      'energyLevel': energyLevel,
-      // Canonical keys from data dictionary
-      'canonical': {
-        'wakeup_time_local': _formatTimeOfDay(wakeUpTime),
-        'bedtime_local': _formatTimeOfDay(bedtime),
-        'sleep_duration_h': sleepDurationHours,
-        'sleep_quality_likert': sleepQuality,
-        'work_pattern': workPattern,
-        'breakfast_habit': breakfastHabit,
-        'meals_per_day': mealsPerDay,
-        'dinner_time_local': _formatTimeOfDay(dinnerTime),
-        'caffeine_per_day': caffeineIntake,
-        'alcohol_freq': alcoholConsumption,
-        'smoker': smokingStatus == 'yes',
-        'perceived_energy': energyLevel,
-      },
-    };
-  }
-}
-
-class _LifestyleFlowResult {
-  const _LifestyleFlowResult({
-    required this.lifestyle,
-    required this.activity,
-    required this.stressSleep,
-  });
-
-  final _LifestyleAnswers lifestyle;
-  final _ActivityAnswers activity;
-  final _StressSleepResult stressSleep;
-}
-
-class _ActivityNavigationResult {
-  const _ActivityNavigationResult.back({
-    required this.activity,
-    this.stress,
-    this.sleep,
-    this.nutrition,
-    this.psych,
-  });
-
-  final Map<String, dynamic> activity;
-  final Map<String, dynamic>? stress;
-  final Map<String, dynamic>? sleep;
-  final Map<String, dynamic>? nutrition;
-  final Map<String, dynamic>? psych;
-}
-
-class _ActivityFlowResult {
-  const _ActivityFlowResult({
-    required this.activity,
-    required this.stressSleep,
-  });
-
-  final _ActivityAnswers activity;
-  final _StressSleepResult stressSleep;
-}
-
-class _LifestyleQuestionnairePage extends StatefulWidget {
-  const _LifestyleQuestionnairePage({
-    this.initialAnswers,
-    this.initialActivityAnswers,
-    this.initialStressAnswers,
-    this.initialSleepAnswers,
-    this.initialNutritionAnswers,
-    this.initialPsychAnswers,
-    this.onLifestyleSaved,
-    this.onActivitySaved,
-    this.onStressSleepSaved,
-    this.onNutritionSaved,
-    this.onPsychSaved,
-  });
-
-  final Map<String, dynamic>? initialAnswers;
-  final Map<String, dynamic>? initialActivityAnswers;
-  final Map<String, dynamic>? initialStressAnswers;
-  final Map<String, dynamic>? initialSleepAnswers;
-  final Map<String, dynamic>? initialNutritionAnswers;
-  final Map<String, dynamic>? initialPsychAnswers;
-  final Future<void> Function(Map<String, dynamic> lifestyle)? onLifestyleSaved;
-  final Future<void> Function(Map<String, dynamic> activity)? onActivitySaved;
-  final Future<void> Function(
-    Map<String, dynamic> stress,
-    Map<String, dynamic> sleep,
-  )? onStressSleepSaved;
-  final Future<void> Function(Map<String, dynamic> nutrition)? onNutritionSaved;
-  final Future<void> Function(Map<String, dynamic> psych)? onPsychSaved;
-
-  @override
-  State<_LifestyleQuestionnairePage> createState() =>
-      _LifestyleQuestionnairePageState();
-}
-
-class _LifestyleQuestionnairePageState
-    extends State<_LifestyleQuestionnairePage> {
-  final _formKey = GlobalKey<FormState>();
-  final TextEditingController _sleepDurationController =
-      TextEditingController();
-
-  TimeOfDay? _wakeUpTime;
-  TimeOfDay? _bedtime;
-  TimeOfDay? _dinnerTime;
-  int? _sleepQuality;
-  String? _workPattern;
-  String? _breakfastHabit;
-  int? _mealsPerDay;
-  String? _caffeineIntake;
-  String? _alcoholConsumption;
-  String? _smokingStatus;
-  String? _energyLevel;
-  int _currentLifestyleSection = 0; // 0, 1, or 2 for the three sections
-  Map<String, dynamic>? _initialActivity;
-  Map<String, dynamic>? _initialStress;
-  Map<String, dynamic>? _initialSleep;
-  Map<String, dynamic>? _initialNutrition;
-  Map<String, dynamic>? _initialPsych;
-
-  @override
-  void initState() {
-    super.initState();
-    _applyInitialAnswers();
-  }
-
-  @override
-  void dispose() {
-    _sleepDurationController.dispose();
-    super.dispose();
-  }
-
-  void _applyInitialAnswers() {
-    final data = widget.initialAnswers;
-    if (data == null) {
-      _initialActivity = widget.initialActivityAnswers;
-      _initialStress = widget.initialStressAnswers;
-      _initialSleep = widget.initialSleepAnswers;
-      _initialNutrition = widget.initialNutritionAnswers;
-      _initialPsych = widget.initialPsychAnswers;
-      return;
-    }
-    _wakeUpTime = _parseTimeOfDay(data['wakeUpTime']?.toString());
-    _bedtime = _parseTimeOfDay(data['bedtime']?.toString());
-    _dinnerTime = _parseTimeOfDay(data['dinnerTime']?.toString());
-    final sleepDuration = data['sleepDurationHours'];
-    final duration = sleepDuration is num
-        ? sleepDuration.toDouble()
-        : double.tryParse(sleepDuration?.toString() ?? '');
-    if (duration != null) {
-      _sleepDurationController.text = duration.toStringAsFixed(
-        duration % 1 == 0 ? 0 : 1,
-      );
-    }
-    final sleepQuality = data['sleepQuality'];
-    if (sleepQuality is num) {
-      _sleepQuality = sleepQuality.clamp(1, 5).round();
-    }
-    final meals = data['mealsPerDay'];
-    if (meals is num) {
-      _mealsPerDay = meals.clamp(1, 6).round();
-    }
-    _workPattern = data['workPattern']?.toString();
-    final breakfast = data['breakfastHabit']?.toString();
-    _breakfastHabit = breakfast != null ? _migrateBreakfastHabit(breakfast) : null;
-    _caffeineIntake = data['caffeineIntake']?.toString();
-    final alcohol = data['alcoholConsumption']?.toString();
-    _alcoholConsumption = alcohol != null ? _migrateAlcoholFreq(alcohol) : null;
-    _smokingStatus = data['smokingStatus']?.toString();
-    _energyLevel = data['energyLevel']?.toString();
-    _initialActivity = widget.initialActivityAnswers;
-    _initialStress = widget.initialStressAnswers;
-    _initialSleep = widget.initialSleepAnswers;
-    _initialNutrition = widget.initialNutritionAnswers;
-    _initialPsych = widget.initialPsychAnswers;
-  }
-
-  /// Logs lifestyle questionnaire interactions to SharedPreferences
-  void _logLifestyleInteraction({
-    required String eventType,
-    required String field,
-    dynamic oldValue,
-    dynamic newValue,
-    Map<String, dynamic>? metadata,
-  }) async {
-    final prefs = await SharedPreferences.getInstance();
-    final userId = FirebaseAuth.instance.currentUser?.uid;
-    if (userId == null) return;
-
-    final key = 'health_questionnaire_interaction_log_$userId';
-    final existingJson = prefs.getString(key);
-    List<Map<String, dynamic>> log = [];
-
-    if (existingJson != null && existingJson.isNotEmpty) {
-      try {
-        final decoded = jsonDecode(existingJson);
-        if (decoded is List) {
-          log = decoded.map((e) => Map<String, dynamic>.from(e as Map)).toList();
-        }
-      } catch (e) {
-        debugPrint('Error loading interaction log: $e');
-      }
-    }
-
-    log.add({
-      'timestamp': DateTime.now().toIso8601String(),
-      'eventType': eventType,
-      'field': field,
-      'oldValue': oldValue,
-      'newValue': newValue,
-      'section': 'lifestyle',
-      ...?metadata,
-    });
-
-    try {
-      await prefs.setString(key, jsonEncode(log));
-    } catch (e) {
-      debugPrint('Error persisting interaction log: $e');
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Scaffold(
-      appBar: AppBar(
-        leading: BackButton(
-          onPressed: () {
-            final navigator = Navigator.of(context);
-            if (navigator.canPop()) {
-              navigator.pop();
-            }
-          },
-        ),
-        title: const Text('Health Profile'),
-        bottom: const _QuestionnaireProgressIndicator(
-          currentStep: 3,
-          totalSteps: 7,
-          sectionName: 'Lifestyle',
-        ),
-      ),
-      body: MediaQuery(
-        data: MediaQuery.of(context).copyWith(
-          textScaler: const TextScaler.linear(1.0),
-        ),
-        child: KeyboardDismissible(
-          child: SafeArea(
-            child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Form(
-              key: _formKey,
-              autovalidateMode: AutovalidateMode.disabled,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text('Typical Day', style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 4),
-                  Text(
-                    "Let's talk about your typical day.",
-                    style: theme.textTheme.bodyMedium,
-                  ),
-                  const SizedBox(height: 12),
-                  ..._buildCurrentLifestyleSection(theme),
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Supplement'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameController,
+                decoration: const InputDecoration(labelText: 'Name'),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: doseController,
+                decoration: const InputDecoration(labelText: 'Dose'),
+              ),
+              const SizedBox(height: 8),
+              DropdownButtonFormField<String>(
+                value: adherence,
+                decoration: const InputDecoration(labelText: 'Adherence'),
+                items: const [
+                  DropdownMenuItem(
+                      value: 'Consistent', child: Text('Consistent')),
+                  DropdownMenuItem(
+                      value: 'Sometimes', child: Text('Sometimes')),
+                  DropdownMenuItem(value: 'Rarely', child: Text('Rarely')),
                 ],
+                onChanged: (value) => adherence = value ?? adherence,
               ),
-            ),
+            ],
           ),
-        ),
-      ),
-      ),
-    );
-  }
-
-  List<Widget> _buildCurrentLifestyleSection(ThemeData theme) {
-    switch (_currentLifestyleSection) {
-      case 0:
-        return _buildLifestyleSection1(theme);
-      case 1:
-        return _buildLifestyleSection2(theme);
-      case 2:
-        return _buildLifestyleSection3(theme);
-      default:
-        return [];
-    }
-  }
-
-  List<Widget> _buildLifestyleSection1(ThemeData theme) {
-    return [
-                  _buildTimeField(
-                    context: context,
-                    label: 'Wake-up time',
-                    value: _wakeUpTime,
-                    onPick: (picked) => setState(() => _wakeUpTime = picked),
-                  ),
-                  const SizedBox(height: 12),
-                  _buildTimeField(
-                    context: context,
-                    label: 'Bedtime',
-                    value: _bedtime,
-                    onPick: (picked) => setState(() => _bedtime = picked),
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: _sleepDurationController,
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
-                    ),
-                    decoration: const InputDecoration(
-                      labelText: 'Average sleep duration (hours)',
-                      hintText: 'e.g. 7.5',
-                    ),
-                    validator: (value) {
-                      final parsed = double.tryParse(
-                        value?.replaceAll(',', '.') ?? '',
-                      );
-                      if (parsed == null || parsed <= 0) {
-                        return 'Enter hours of sleep';
-                      }
-                      if (parsed > 24) {
-                        return 'Sleep duration must be less than 24 hours';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<int>(
-                    key: ValueKey('sleepQuality-$_sleepQuality'),
-                    initialValue: _sleepQuality,
-                    decoration: const InputDecoration(
-                      labelText: 'Sleep quality (1–5)',
-                    ),
-                    items: List.generate(5, (index) {
-                      final value = index + 1;
-                      return DropdownMenuItem(
-                        value: value,
-                        child: Text(value.toString()),
-                      );
-                    }),
-                    onChanged: (value) =>
-                        setState(() => _sleepQuality = value),
-                    validator: (value) => value == null ? 'Please select sleep quality' : null,
-                  ),
-                  const SizedBox(height: 16),
-                  FilledButton(
-                    onPressed: _goToLifestyleSection2,
-                    child: const Text('Next'),
-                  ),
-    ];
-  }
-
-  List<Widget> _buildLifestyleSection2(ThemeData theme) {
-    return [
-                  DropdownButtonFormField<String>(
-                    key: ValueKey('workPattern-${_workPattern ?? 'unset'}'),
-                    initialValue: _workPattern,
-                    decoration: const InputDecoration(
-                      labelText: 'Work pattern',
-                    ),
-                    items: _workPatternOptions
-                        .map(
-                          (option) => DropdownMenuItem(
-                            value: option.value,
-                            child: Text(option.label),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: (value) {
-                      final oldPattern = _workPattern;
-                      setState(() => _workPattern = value);
-                      _logLifestyleInteraction(
-                        eventType: 'selection',
-                        field: 'workPattern',
-                        oldValue: oldPattern,
-                        newValue: value,
-                      );
-                    },
-                    validator: (value) =>
-                        value == null ? 'Select your work pattern' : null,
-                  ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<String>(
-                    key: ValueKey('breakfast-${_breakfastHabit ?? 'unset'}'),
-                    initialValue: _breakfastHabit,
-                    decoration: const InputDecoration(
-                      labelText: 'Breakfast habit',
-                    ),
-                    items: _breakfastHabitOptions
-                        .map(
-                          (option) => DropdownMenuItem(
-                            value: option.value,
-                            child: Text(option.label),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: (value) =>
-                        setState(() => _breakfastHabit = value),
-                    validator: (value) =>
-                        value == null ? 'Tell us about breakfast' : null,
-                  ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<int>(
-                    key: ValueKey('meals-${_mealsPerDay ?? 'unset'}'),
-                    initialValue: _mealsPerDay,
-                    decoration: const InputDecoration(
-                      labelText: 'Number of main meals per day',
-                    ),
-                    items: List.generate(6, (index) {
-                      final value = index + 1;
-                      return DropdownMenuItem(
-                        value: value,
-                        child: Text(value.toString()),
-                      );
-                    }),
-                    onChanged: (value) {
-                      final oldMeals = _mealsPerDay;
-                      setState(() => _mealsPerDay = value);
-                      _logLifestyleInteraction(
-                        eventType: 'selection',
-                        field: 'mealsPerDay',
-                        oldValue: oldMeals,
-                        newValue: value,
-                      );
-                    },
-                    validator: (value) =>
-                        value == null ? 'Select meals per day' : null,
-                  ),
-                  const SizedBox(height: 12),
-                  _buildTimeField(
-                    context: context,
-                    label: 'Typical dinner time',
-                    value: _dinnerTime,
-                    onPick: (picked) => setState(() => _dinnerTime = picked),
-                  ),
-                  const SizedBox(height: 16),
-                  FilledButton(
-                    onPressed: _goToLifestyleSection3,
-                    child: const Text('Next'),
-                  ),
-    ];
-  }
-
-  List<Widget> _buildLifestyleSection3(ThemeData theme) {
-    return [
-                  DropdownButtonFormField<String>(
-                    key: ValueKey('caffeine-${_caffeineIntake ?? 'unset'}'),
-                    initialValue: _caffeineIntake,
-                    decoration: const InputDecoration(
-                      labelText: 'Caffeine intake per day',
-                    ),
-                    items: _caffeineOptions
-                        .map(
-                          (option) => DropdownMenuItem(
-                            value: option.value,
-                            child: Text(option.label),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: (value) =>
-                        setState(() => _caffeineIntake = value),
-                    validator: (value) =>
-                        value == null ? 'Select caffeine intake' : null,
-                  ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<String>(
-                    key: ValueKey('alcohol-${_alcoholConsumption ?? 'unset'}'),
-                    initialValue: _alcoholConsumption,
-                    decoration: const InputDecoration(
-                      labelText: 'Alcohol consumption',
-                    ),
-                    items: _alcoholOptions
-                        .map(
-                          (option) => DropdownMenuItem(
-                            value: option.value,
-                            child: Text(option.label),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: (value) =>
-                        setState(() => _alcoholConsumption = value),
-                    validator: (value) =>
-                        value == null ? 'Select alcohol consumption' : null,
-                  ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<String>(
-                    key: ValueKey('smoking-${_smokingStatus ?? 'unset'}'),
-                    initialValue: _smokingStatus,
-                    decoration: const InputDecoration(
-                      labelText: 'Smoking status',
-                    ),
-                    items: _smokingOptions
-                        .map(
-                          (option) => DropdownMenuItem(
-                            value: option.value,
-                            child: Text(option.label),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: (value) =>
-                        setState(() => _smokingStatus = value),
-                    validator: (value) =>
-                        value == null ? 'Select smoking status' : null,
-                  ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<String>(
-                    key: ValueKey('energy-${_energyLevel ?? 'unset'}'),
-                    initialValue: _energyLevel,
-                    decoration: const InputDecoration(
-                      labelText: 'Perceived energy level throughout the day',
-                    ),
-                    items: _energyLevelOptions
-                        .map(
-                          (option) => DropdownMenuItem(
-                            value: option.value,
-                            child: Text(option.label),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: (value) => setState(() => _energyLevel = value),
-                    validator: (value) =>
-                        value == null ? 'Select energy level' : null,
-                  ),
-                  const SizedBox(height: 16),
-                  FilledButton(
-                    onPressed: _handleSubmit,
-                    child: const Text('(Next) Physical Health'),
-                  ),
-    ];
-  }
-
-  FormField<TimeOfDay> _buildTimeField({
-    required BuildContext context,
-    required String label,
-    required TimeOfDay? value,
-    required ValueChanged<TimeOfDay> onPick,
-  }) {
-    return FormField<TimeOfDay>(
-      key: ValueKey(
-        '$label-${value != null ? _formatTimeOfDay(value) : 'unset'}',
-      ),
-      initialValue: value,
-      validator: (val) => val == null ? 'Select $label' : null,
-      builder: (state) {
-        final display = state.value != null
-            ? MaterialLocalizations.of(
-                context,
-              ).formatTimeOfDay(state.value!, alwaysUse24HourFormat: false)
-            : 'Select';
-        final error = state.errorText;
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              title: Text(label),
-              subtitle: Text(display),
-              trailing: const Icon(Icons.access_time),
-              onTap: () async {
-                final picked = await showTimePicker(
-                  context: context,
-                  initialTime:
-                      state.value ?? const TimeOfDay(hour: 7, minute: 0),
-                );
-                if (picked != null) {
-                  state.didChange(picked);
-                  onPick(picked);
-                }
-              },
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
             ),
-            if (error != null)
-              Padding(
-                padding: const EdgeInsets.only(left: 16, right: 16, bottom: 4),
-                child: Text(
-                  error,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.error,
-                  ),
-                ),
-              ),
+            FilledButton(
+              onPressed: () {
+                if (nameController.text.trim().isEmpty) return;
+                Navigator.of(context).pop({
+                  'name': nameController.text.trim(),
+                  'dose': doseController.text.trim(),
+                  'adherence': adherence,
+                });
+              },
+              child: const Text('Add'),
+            ),
           ],
         );
       },
     );
-  }
 
-  /// Migrates old breakfast habit values to canonical values
-  String _migrateBreakfastHabit(String oldValue) {
-    const migration = {
-      'every_day': 'daily',
-    };
-    return migration[oldValue] ?? oldValue;
-  }
-
-  /// Migrates old alcohol frequency values to canonical values
-  String _migrateAlcoholFreq(String oldValue) {
-    const migration = {
-      'occasionally': 'occasional',
-      'several_week': 'several_per_week',
-    };
-    return migration[oldValue] ?? oldValue;
-  }
-
-  void _goToLifestyleSection2() {
-    // Validate section 1 fields before proceeding
-    FocusScope.of(context).unfocus();
-    final formValid = _formKey.currentState?.validate() ?? false;
-
-    if (!formValid) {
-      return;
-    }
-    if (_wakeUpTime == null || _bedtime == null || _sleepQuality == null) {
-      return;
-    }
-
-    setState(() {
-      _currentLifestyleSection = 1;
-    });
-  }
-
-  void _goToLifestyleSection3() {
-    // Validate section 2 fields before proceeding
-    FocusScope.of(context).unfocus();
-    final formValid = _formKey.currentState?.validate() ?? false;
-
-    if (!formValid) {
-      return;
-    }
-    if (_workPattern == null || _breakfastHabit == null || _mealsPerDay == null || _dinnerTime == null) {
-      return;
-    }
-
-    setState(() {
-      _currentLifestyleSection = 2;
-    });
-  }
-
-  Future<void> _handleSubmit() async {
-    FocusScope.of(context).unfocus();
-    if (!(_formKey.currentState?.validate() ?? false)) {
-      return;
-    }
-    final sleepDuration = double.parse(
-      _sleepDurationController.text.replaceAll(',', '.'),
-    );
-    final answers = _LifestyleAnswers(
-      wakeUpTime: _wakeUpTime!,
-      bedtime: _bedtime!,
-      sleepDurationHours: sleepDuration,
-      sleepQuality: _sleepQuality!,
-      workPattern: _workPattern!,
-      breakfastHabit: _breakfastHabit!,
-      mealsPerDay: _mealsPerDay!,
-      dinnerTime: _dinnerTime!,
-      caffeineIntake: _caffeineIntake!,
-      alcoholConsumption: _alcoholConsumption!,
-      smokingStatus: _smokingStatus!,
-      energyLevel: _energyLevel!,
-    );
-    final lifestyleMap = answers.toMap();
-    if (widget.onLifestyleSaved != null) {
-      await widget.onLifestyleSaved!(
-        Map<String, dynamic>.from(lifestyleMap),
-      );
-      if (!mounted) {
-        return;
-      }
-    }
-    final activityOutcome = await Navigator.of(context).push<Object?>(
-      _buildHealthQuestionnaireRoute(
-        page: _ActivityQuestionnairePage(
-          initialAnswers: _initialActivity,
-          initialStressAnswers: _initialStress,
-          initialSleepAnswers: _initialSleep,
-          initialNutritionAnswers: _initialNutrition,
-          initialPsychAnswers: _initialPsych,
-          onActivitySaved: widget.onActivitySaved,
-          onStressSleepSaved: widget.onStressSleepSaved,
-          onNutritionSaved: widget.onNutritionSaved,
-          onPsychSaved: widget.onPsychSaved,
-        ),
-        fullscreenDialog: true,
-      ),
-    );
-
-    if (!mounted) {
-      return;
-    }
-
-    if (activityOutcome is _ActivityNavigationResult) {
-      final activityMap =
-          Map<String, dynamic>.from(activityOutcome.activity);
-      final stressMap = activityOutcome.stress != null
-          ? Map<String, dynamic>.from(activityOutcome.stress!)
-          : null;
-      final sleepMap = activityOutcome.sleep != null
-          ? Map<String, dynamic>.from(activityOutcome.sleep!)
-          : null;
-      final nutritionMap = activityOutcome.nutrition != null
-          ? Map<String, dynamic>.from(activityOutcome.nutrition!)
-          : null;
-      final psychMap = activityOutcome.psych != null
-          ? Map<String, dynamic>.from(activityOutcome.psych!)
-          : null;
-
-      if (widget.onActivitySaved != null) {
-        await widget.onActivitySaved!(Map<String, dynamic>.from(activityMap));
-        if (!mounted) {
-          return;
-        }
-      }
-      if (stressMap != null && sleepMap != null &&
-          widget.onStressSleepSaved != null) {
-        await widget.onStressSleepSaved!(
-          Map<String, dynamic>.from(stressMap),
-          Map<String, dynamic>.from(sleepMap),
-        );
-        if (!mounted) {
-          return;
-        }
-      }
-      if (nutritionMap != null && widget.onNutritionSaved != null) {
-        await widget.onNutritionSaved!(
-          Map<String, dynamic>.from(nutritionMap),
-        );
-        if (!mounted) {
-          return;
-        }
-      }
-      if (psychMap != null && widget.onPsychSaved != null) {
-        await widget.onPsychSaved!(Map<String, dynamic>.from(psychMap));
-        if (!mounted) {
-          return;
-        }
-      }
-
-      if (!mounted) {
-        return;
-      }
-
-      setState(() {
-        _initialActivity = activityMap;
-        if (stressMap != null) {
-          _initialStress = stressMap;
-        }
-        if (sleepMap != null) {
-          _initialSleep = sleepMap;
-        }
-        if (nutritionMap != null) {
-          _initialNutrition = nutritionMap;
-        }
-        if (psychMap != null) {
-          _initialPsych = psychMap;
-        }
-      });
-      return;
-    }
-
-    if (activityOutcome is! _ActivityFlowResult) {
-      return;
-    }
-
-    final activityResult = activityOutcome;
-
-    final activityMap = activityResult.activity.toMap();
-    final stressMap = activityResult.stressSleep.toStressMapWithLoad();
-    final sleepMap = activityResult.stressSleep.toSleepMap();
-    final nutritionMap = activityResult.stressSleep.toNutritionMap();
-    final psychMap = activityResult.stressSleep.toPsychMap();
-
-    _initialActivity = activityMap;
-    _initialStress = stressMap;
-    _initialSleep = sleepMap;
-    _initialNutrition = nutritionMap;
-    _initialPsych = psychMap;
-
-    if (widget.onActivitySaved != null) {
-      await widget.onActivitySaved!(Map<String, dynamic>.from(activityMap));
-    }
-    if (widget.onStressSleepSaved != null) {
-      await widget.onStressSleepSaved!(
-        Map<String, dynamic>.from(stressMap),
-        Map<String, dynamic>.from(sleepMap),
-      );
-      if (!mounted) {
-        return;
-      }
-    }
-    if (widget.onNutritionSaved != null) {
-      await widget.onNutritionSaved!(
-        Map<String, dynamic>.from(nutritionMap),
-      );
-    }
-    if (widget.onPsychSaved != null) {
-      await widget.onPsychSaved!(Map<String, dynamic>.from(psychMap));
-    }
-
-    Navigator.of(context).pop(
-      _LifestyleFlowResult(
-        lifestyle: answers,
-        activity: activityResult.activity,
-        stressSleep: activityResult.stressSleep,
-      ),
-    );
-  }
-}
-
-/// Physical Activity answers based on IPAQ-SF (International Physical Activity Questionnaire - Short Form)
-/// Canonical keys: activity.vig_days_per_week, activity.vig_min_per_day, etc.
-class _ActivityAnswers {
-  const _ActivityAnswers({
-    required this.vigorousDays,
-    required this.vigorousMinutes,
-    required this.moderateDays,
-    required this.moderateMinutes,
-    required this.walkingDays,
-    required this.walkingMinutes,
-    required this.sittingHours,
-  });
-
-  final int vigorousDays; // activity.vig_days_per_week
-  final double vigorousMinutes; // activity.vig_min_per_day
-  final int moderateDays; // activity.mod_days_per_week
-  final double moderateMinutes; // activity.mod_min_per_day
-  final int walkingDays; // activity.walk_days_per_week
-  final double walkingMinutes; // activity.walk_min_per_day
-  final double sittingHours; // activity.sitting_hours_per_day
-
-  /// Canonical: activity.met_minutes_week
-  /// Formula: 8.0*vig_days*vig_min + 4.0*mod_days*mod_min + 3.3*walk_days*walk_min
-  double get metMinutesWeek =>
-      (vigorousDays * vigorousMinutes * 8.0) +
-      (moderateDays * moderateMinutes * 4.0) +
-      (walkingDays * walkingMinutes * 3.3);
-
-  double get activityIndex {
-    const double maxMet = 6000; // approximate vigorous target
-    final index = (metMinutesWeek / maxMet) * 100;
-    if (index.isNaN) return 0;
-    return index.clamp(0, 100);
-  }
-
-  String get activityLevel {
-    final index = activityIndex;
-    if (index < 33) return 'Low';
-    if (index < 67) return 'Moderate';
-    return 'High';
-  }
-
-  Map<String, dynamic> toMap() {
-    return {
-      // Legacy keys (for backward compatibility)
-      'vigorousDaysPerWeek': vigorousDays,
-      'vigorousMinutesPerDay': vigorousMinutes,
-      'moderateDaysPerWeek': moderateDays,
-      'moderateMinutesPerDay': moderateMinutes,
-      'walkingDaysPerWeek': walkingDays,
-      'walkingMinutesPerDay': walkingMinutes,
-      'sittingHoursPerDay': sittingHours,
-      'metMinutesWeek': metMinutesWeek,
-      'activityIndex': activityIndex,
-      'activityLevel': activityLevel,
-      // Canonical keys from data dictionary (IPAQ-SF adapted)
-      'canonical': {
-        'vig_days_per_week': vigorousDays,
-        'vig_min_per_day': vigorousMinutes,
-        'mod_days_per_week': moderateDays,
-        'mod_min_per_day': moderateMinutes,
-        'walk_days_per_week': walkingDays,
-        'walk_min_per_day': walkingMinutes,
-        'sitting_hours_per_day': sittingHours,
-        'met_minutes_week': metMinutesWeek,
-      },
-    };
-  }
-}
-
-/// Perceived Stress Scale - 4 item version (PSS-4)
-/// Canonical keys: stress.pss4_item1..4, stress.pss4_score
-class _StressAnswers {
-  const _StressAnswers({required this.responses});
-
-  final List<int> responses; // 4 items, each 0-4 Likert scale
-
-  /// PSS-4 score with reverse-coded items (items 2 and 3)
-  /// Items 2 ("confident handling problems") and 3 ("things going your way") are positive
-  /// and need to be reverse-coded: reversed = 4 - original
-  /// Total score range: 0-16
-  int get pss4Score {
-    if (responses.length != 4) return 0;
-    final item1 = responses[0]; // Felt unable to control (direct)
-    final item2 = 4 - responses[1]; // Felt confident (REVERSE)
-    final item3 = 4 - responses[2]; // Things going your way (REVERSE)
-    final item4 = responses[3]; // Difficulties piling up (direct)
-    return item1 + item2 + item3 + item4;
-  }
-
-  double get normalizedScore {
-    final total = responses.fold<int>(0, (sum, value) => sum + value);
-    return (total / (responses.length * 4)) * 100;
-  }
-
-  Map<String, dynamic> toMap() {
-    return {
-      // Legacy keys
-      'items': responses,
-      'index': normalizedScore,
-      // Canonical keys from data dictionary (PSS-4)
-      'canonical': {
-        'pss4_item1': responses.isNotEmpty ? responses[0] : 0,
-        'pss4_item2': responses.length > 1 ? responses[1] : 0,
-        'pss4_item3': responses.length > 2 ? responses[2] : 0,
-        'pss4_item4': responses.length > 3 ? responses[3] : 0,
-        'pss4_score': pss4Score, // 0-16 with reverse-coded items
-      },
-    };
-  }
-}
-
-/// Insomnia Severity Index - 7 item version (ISI-7)
-/// Canonical keys: sleep.isi_item1..7, sleep.isi_score
-class _SleepAnswers {
-  const _SleepAnswers({required this.responses});
-
-  final List<int> responses; // 7 items, each 0-4 Likert scale
-
-  /// ISI-7 total score (sum of all 7 items)
-  /// Score range: 0-28
-  /// Interpretation: 0-7 = no insomnia, 8-14 = subthreshold, 15-21 = moderate, 22-28 = severe
-  int get isiScore {
-    if (responses.length != 7) return 0;
-    return responses.fold<int>(0, (sum, value) => sum + value);
-  }
-
-  double get normalizedScore {
-    final total = responses.fold<int>(0, (sum, value) => sum + value);
-    final maxScore = responses.length * 4;
-    if (maxScore == 0) return 0;
-    final inverted = 1 - (total / maxScore);
-    return inverted * 100;
-  }
-
-  Map<String, dynamic> toMap() {
-    return {
-      // Legacy keys
-      'items': responses,
-      'index': normalizedScore,
-      // Canonical keys from data dictionary (ISI-7)
-      'canonical': {
-        'isi_item1': responses.isNotEmpty ? responses[0] : 0,
-        'isi_item2': responses.length > 1 ? responses[1] : 0,
-        'isi_item3': responses.length > 2 ? responses[2] : 0,
-        'isi_item4': responses.length > 3 ? responses[3] : 0,
-        'isi_item5': responses.length > 4 ? responses[4] : 0,
-        'isi_item6': responses.length > 5 ? responses[5] : 0,
-        'isi_item7': responses.length > 6 ? responses[6] : 0,
-        'isi_score': isiScore, // 0-28 total score
-      },
-    };
-  }
-}
-
-class _ActivityQuestionnairePage extends StatefulWidget {
-  const _ActivityQuestionnairePage({
-    this.initialAnswers,
-    this.initialStressAnswers,
-    this.initialSleepAnswers,
-    this.initialNutritionAnswers,
-    this.initialPsychAnswers,
-    this.onActivitySaved,
-    this.onStressSleepSaved,
-    this.onNutritionSaved,
-    this.onPsychSaved,
-  });
-
-  final Map<String, dynamic>? initialAnswers;
-  final Map<String, dynamic>? initialStressAnswers;
-  final Map<String, dynamic>? initialSleepAnswers;
-  final Map<String, dynamic>? initialNutritionAnswers;
-  final Map<String, dynamic>? initialPsychAnswers;
-  final Future<void> Function(Map<String, dynamic> activity)? onActivitySaved;
-  final Future<void> Function(
-    Map<String, dynamic> stress,
-    Map<String, dynamic> sleep,
-  )? onStressSleepSaved;
-  final Future<void> Function(Map<String, dynamic> nutrition)? onNutritionSaved;
-  final Future<void> Function(Map<String, dynamic> psych)? onPsychSaved;
-
-  @override
-  State<_ActivityQuestionnairePage> createState() =>
-      _ActivityQuestionnairePageState();
-}
-
-class _ActivityQuestionnairePageState
-    extends State<_ActivityQuestionnairePage> {
-  final _formKey = GlobalKey<FormState>();
-  final TextEditingController _vigorousMinutesController =
-      TextEditingController();
-  final TextEditingController _moderateMinutesController =
-      TextEditingController();
-  final TextEditingController _walkingMinutesController =
-      TextEditingController();
-  final TextEditingController _sittingHoursController = TextEditingController();
-
-  int? _vigorousDays;
-  int? _moderateDays;
-  int? _walkingDays;
-  int _currentActivitySection = 0; // 0 or 1 for the two sections
-  Map<String, dynamic>? _initialStress;
-  Map<String, dynamic>? _initialSleep;
-  Map<String, dynamic>? _initialNutrition;
-  Map<String, dynamic>? _initialPsych;
-
-  @override
-  void initState() {
-    super.initState();
-    _applyInitialAnswers();
-  }
-
-  @override
-  void dispose() {
-    _vigorousMinutesController.dispose();
-    _moderateMinutesController.dispose();
-    _walkingMinutesController.dispose();
-    _sittingHoursController.dispose();
-    super.dispose();
-  }
-
-  void _applyInitialAnswers() {
-    final data = widget.initialAnswers;
-    if (data == null) {
-      _initialStress = widget.initialStressAnswers;
-      _initialSleep = widget.initialSleepAnswers;
-      _initialNutrition = widget.initialNutritionAnswers;
-      _initialPsych = widget.initialPsychAnswers;
-      return;
-    }
-    final vigDays = data['vigorousDaysPerWeek'];
-    if (vigDays is num) {
-      _vigorousDays = vigDays.clamp(0, 7).round();
-    }
-    final vigMinutes = data['vigorousMinutesPerDay'];
-    if (vigMinutes is num) {
-      _vigorousMinutesController.text = vigMinutes.toDouble().toStringAsFixed(
-        vigMinutes % 1 == 0 ? 0 : 1,
-      );
-    }
-    final modDays = data['moderateDaysPerWeek'];
-    if (modDays is num) {
-      _moderateDays = modDays.clamp(0, 7).round();
-    }
-    final modMinutes = data['moderateMinutesPerDay'];
-    if (modMinutes is num) {
-      _moderateMinutesController.text = modMinutes.toDouble().toStringAsFixed(
-        modMinutes % 1 == 0 ? 0 : 1,
-      );
-    }
-    final walkDays = data['walkingDaysPerWeek'];
-    if (walkDays is num) {
-      _walkingDays = walkDays.clamp(0, 7).round();
-    }
-    final walkMinutes = data['walkingMinutesPerDay'];
-    if (walkMinutes is num) {
-      _walkingMinutesController.text = walkMinutes.toDouble().toStringAsFixed(
-        walkMinutes % 1 == 0 ? 0 : 1,
-      );
-    }
-    final sittingHours = data['sittingHoursPerDay'];
-    if (sittingHours is num) {
-      _sittingHoursController.text = sittingHours.toDouble().toStringAsFixed(
-        sittingHours % 1 == 0 ? 0 : 1,
-      );
-    }
-    _initialStress = widget.initialStressAnswers;
-    _initialSleep = widget.initialSleepAnswers;
-    _initialNutrition = widget.initialNutritionAnswers;
-    _initialPsych = widget.initialPsychAnswers;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, _) {
-        if (didPop) {
-          return;
-        }
-        _handleBackToLifestyle();
-      },
-      child: Scaffold(
-        appBar: AppBar(
-          leading: BackButton(onPressed: _handleBackToLifestyle),
-          title: const Text('Health Profile'),
-          bottom: const _QuestionnaireProgressIndicator(
-            currentStep: 4,
-            totalSteps: 7,
-            sectionName: 'Activity & Movement',
-          ),
-        ),
-        body: KeyboardDismissible(
-          child: SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: Form(
-                key: _formKey,
-                autovalidateMode: AutovalidateMode.disabled,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(
-                      'Activity & Movement',
-                      style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      "Let's capture your weekly activity.",
-                      style: theme.textTheme.bodyMedium,
-                    ),
-                    const SizedBox(height: 12),
-                    ..._buildCurrentActivitySection(theme),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  List<Widget> _buildCurrentActivitySection(ThemeData theme) {
-    switch (_currentActivitySection) {
-      case 0:
-        return _buildActivitySection1(theme);
-      case 1:
-        return _buildActivitySection2(theme);
-      default:
-        return [];
-    }
-  }
-
-  List<Widget> _buildActivitySection1(ThemeData theme) {
-    return [
-                    _buildDaysDropdown(
-                      label: 'Days per week with vigorous activity',
-                      value: _vigorousDays,
-                      onChanged: (value) =>
-                          setState(() => _vigorousDays = value),
-                    ),
-                    const SizedBox(height: 12),
-                    _buildMinutesField(
-                      controller: _vigorousMinutesController,
-                      label: 'Average minutes per day of vigorous activity',
-                      requirePositive: (_vigorousDays ?? 0) > 0,
-                    ),
-                    const SizedBox(height: 12),
-                    _buildDaysDropdown(
-                      label: 'Days per week with moderate activity',
-                      value: _moderateDays,
-                      onChanged: (value) =>
-                          setState(() => _moderateDays = value),
-                    ),
-                    const SizedBox(height: 12),
-                    _buildMinutesField(
-                      controller: _moderateMinutesController,
-                      label: 'Average minutes per day of moderate activity',
-                      requirePositive: (_moderateDays ?? 0) > 0,
-                    ),
-                    const SizedBox(height: 16),
-                    FilledButton(
-                      onPressed: _goToActivitySection2,
-                      child: const Text('Next'),
-                    ),
-    ];
-  }
-
-  List<Widget> _buildActivitySection2(ThemeData theme) {
-    return [
-                    _buildDaysDropdown(
-                      label: 'Days per week walking ≥10 minutes continuously',
-                      value: _walkingDays,
-                      onChanged: (value) =>
-                          setState(() => _walkingDays = value),
-                    ),
-                    const SizedBox(height: 12),
-                    _buildMinutesField(
-                      controller: _walkingMinutesController,
-                      label: 'Average minutes per day walking',
-                      requirePositive: (_walkingDays ?? 0) > 0,
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _sittingHoursController,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      decoration: const InputDecoration(
-                        labelText: 'Typical sitting time per day (hours)',
-                        hintText: 'e.g. 8',
-                      ),
-                      validator: (value) {
-                        final parsed = _parseNonNegative(value);
-                        if (parsed == null) {
-                          return 'Enter sitting hours per day';
-                        }
-                        if (parsed > 24) {
-                          return 'Must be 24 hours or less';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    FilledButton(
-                      onPressed: _handleSubmit,
-                      child: const Text('(Next) Stress & Sleep'),
-                    ),
-    ];
-  }
-
-  Map<String, dynamic> _currentActivityMap() {
-    final vigorousMinutes =
-        _parseNonNegative(_vigorousMinutesController.text) ?? 0;
-    final moderateMinutes =
-        _parseNonNegative(_moderateMinutesController.text) ?? 0;
-    final walkingMinutes =
-        _parseNonNegative(_walkingMinutesController.text) ?? 0;
-    final sittingHours = _parseNonNegative(_sittingHoursController.text) ?? 0;
-
-    final hasInput =
-        (_vigorousDays ?? 0) != 0 ||
-        (_moderateDays ?? 0) != 0 ||
-        (_walkingDays ?? 0) != 0 ||
-        vigorousMinutes != 0 ||
-        moderateMinutes != 0 ||
-        walkingMinutes != 0 ||
-        sittingHours != 0;
-
-    if (!hasInput) {
-      final existing = widget.initialAnswers;
-      if (existing != null) {
-        return Map<String, dynamic>.from(existing);
-      }
-    }
-
-    final draft = _ActivityAnswers(
-      vigorousDays: _vigorousDays ?? 0,
-      vigorousMinutes: vigorousMinutes,
-      moderateDays: _moderateDays ?? 0,
-      moderateMinutes: moderateMinutes,
-      walkingDays: _walkingDays ?? 0,
-      walkingMinutes: walkingMinutes,
-      sittingHours: sittingHours,
-    );
-    return draft.toMap();
-  }
-
-  DropdownButtonFormField<int> _buildDaysDropdown({
-    required String label,
-    required int? value,
-    required ValueChanged<int?> onChanged,
-  }) {
-    return DropdownButtonFormField<int>(
-      key: ValueKey('$label-${value ?? 'unset'}'),
-      initialValue: value,
-      decoration: InputDecoration(labelText: label),
-      items: List.generate(8, (index) {
-        return DropdownMenuItem(value: index, child: Text(index.toString()));
-      }),
-      onChanged: onChanged,
-      validator: (val) => val == null ? 'Select $label' : null,
-    );
-  }
-
-  TextFormField _buildMinutesField({
-    required TextEditingController controller,
-    required String label,
-    required bool requirePositive,
-  }) {
-    return TextFormField(
-      controller: controller,
-      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-      decoration: InputDecoration(labelText: label, hintText: 'e.g. 30'),
-      validator: (value) {
-        final parsed = _parseNonNegative(value);
-        if (requirePositive) {
-          if (parsed == null || parsed < 0) {
-            return 'Enter minutes for this activity';
-          }
-        } else if (parsed != null && parsed < 0) {
-          return 'Minutes cannot be negative';
-        }
-        return null;
-      },
-    );
-  }
-
-  double? _parseNonNegative(String? value) {
-    final cleaned = value?.replaceAll(',', '.').trim();
-    if (cleaned == null || cleaned.isEmpty) return null;
-    final parsed = double.tryParse(cleaned);
-    if (parsed == null || parsed < 0) return null;
-    return parsed;
-  }
-
-  void _goToActivitySection2() {
-    // Validate section 1 fields before proceeding
-    FocusScope.of(context).unfocus();
-    final formValid = _formKey.currentState?.validate() ?? false;
-
-    if (!formValid) {
-      return;
-    }
-    if (_vigorousDays == null || _moderateDays == null) {
-      return;
-    }
-
-    setState(() {
-      _currentActivitySection = 1;
-    });
-  }
-
-  Future<void> _handleSubmit() async {
-    FocusScope.of(context).unfocus();
-    if (!(_formKey.currentState?.validate() ?? false)) {
-      return;
-    }
-    final vigorousMinutes =
-        _parseNonNegative(_vigorousMinutesController.text) ?? 0;
-    final moderateMinutes =
-        _parseNonNegative(_moderateMinutesController.text) ?? 0;
-    final walkingMinutes =
-        _parseNonNegative(_walkingMinutesController.text) ?? 0;
-    final sittingHours = _parseNonNegative(_sittingHoursController.text) ?? 0;
-
-    final activityAnswers = _ActivityAnswers(
-      vigorousDays: _vigorousDays ?? 0,
-      vigorousMinutes: vigorousMinutes,
-      moderateDays: _moderateDays ?? 0,
-      moderateMinutes: moderateMinutes,
-      walkingDays: _walkingDays ?? 0,
-      walkingMinutes: walkingMinutes,
-      sittingHours: sittingHours,
-    );
-    final activityMap = activityAnswers.toMap();
-    if (widget.onActivitySaved != null) {
-      await widget.onActivitySaved!(Map<String, dynamic>.from(activityMap));
-      if (!mounted) {
-        return;
-      }
-    }
-    final stressOutcome = await Navigator.of(context).push<Object?>(
-      _buildHealthQuestionnaireRoute(
-        page: _StressSleepQuestionnairePage(
-          initialStressAnswers: _initialStress,
-          initialSleepAnswers: _initialSleep,
-          initialNutritionAnswers: _initialNutrition,
-          initialPsychAnswers: _initialPsych,
-          onStressSleepSaved: widget.onStressSleepSaved,
-          onNutritionSaved: widget.onNutritionSaved,
-          onPsychSaved: widget.onPsychSaved,
-        ),
-        fullscreenDialog: true,
-      ),
-    );
-
-    if (!mounted) {
-      return;
-    }
-
-    if (stressOutcome is _StressSleepNavigationResult) {
-      final stressMap = Map<String, dynamic>.from(stressOutcome.stress);
-      final sleepMap = Map<String, dynamic>.from(stressOutcome.sleep);
-      final nutritionMap = stressOutcome.nutrition != null
-          ? Map<String, dynamic>.from(stressOutcome.nutrition!)
-          : null;
-      final psychMap = stressOutcome.psych != null
-          ? Map<String, dynamic>.from(stressOutcome.psych!)
-          : null;
-
-      if (widget.onStressSleepSaved != null) {
-        await widget.onStressSleepSaved!(
-          Map<String, dynamic>.from(stressMap),
-          Map<String, dynamic>.from(sleepMap),
-        );
-        if (!mounted) {
-          return;
-        }
-      }
-      if (nutritionMap != null && widget.onNutritionSaved != null) {
-        await widget.onNutritionSaved!(
-          Map<String, dynamic>.from(nutritionMap),
-        );
-        if (!mounted) {
-          return;
-        }
-      }
-      if (psychMap != null && widget.onPsychSaved != null) {
-        await widget.onPsychSaved!(Map<String, dynamic>.from(psychMap));
-        if (!mounted) {
-          return;
-        }
-      }
-
-      _initialStress = stressMap;
-      _initialSleep = sleepMap;
-      if (nutritionMap != null) {
-        _initialNutrition = nutritionMap;
-      }
-      if (psychMap != null) {
-        _initialPsych = psychMap;
-      }
-      return;
-    }
-
-    if (stressOutcome is! _StressSleepResult) {
-      return;
-    }
-
-    final stressSleepResult = stressOutcome;
-
-    final stressMap = stressSleepResult.toStressMapWithLoad();
-    final sleepMap = stressSleepResult.toSleepMap();
-    final nutritionMap = stressSleepResult.toNutritionMap();
-    final psychMap = stressSleepResult.toPsychMap();
-
-    _initialStress = stressMap;
-    _initialSleep = sleepMap;
-    _initialNutrition = nutritionMap;
-    _initialPsych = psychMap;
-
-    if (widget.onStressSleepSaved != null) {
-      await widget.onStressSleepSaved!(
-        Map<String, dynamic>.from(stressMap),
-        Map<String, dynamic>.from(sleepMap),
-      );
-      if (!mounted) {
-        return;
-      }
-    }
-    if (widget.onNutritionSaved != null) {
-      await widget.onNutritionSaved!(
-        Map<String, dynamic>.from(nutritionMap),
-      );
-      if (!mounted) {
-        return;
-      }
-    }
-    if (widget.onPsychSaved != null) {
-      await widget.onPsychSaved!(Map<String, dynamic>.from(psychMap));
-      if (!mounted) {
-        return;
-      }
-    }
-
-    Navigator.of(context).pop(
-      _ActivityFlowResult(
-        activity: activityAnswers,
-        stressSleep: stressSleepResult,
-      ),
-    );
-  }
-
-  void _handleBackToLifestyle() {
-    final stressCopy = _initialStress != null
-        ? Map<String, dynamic>.from(_initialStress!)
-        : null;
-    final sleepCopy = _initialSleep != null
-        ? Map<String, dynamic>.from(_initialSleep!)
-        : null;
-    final nutritionCopy = _initialNutrition != null
-        ? Map<String, dynamic>.from(_initialNutrition!)
-        : null;
-    final psychCopy = _initialPsych != null
-        ? Map<String, dynamic>.from(_initialPsych!)
-        : null;
-    Navigator.of(context).pop(
-      _ActivityNavigationResult.back(
-        activity: _currentActivityMap(),
-        stress: stressCopy,
-        sleep: sleepCopy,
-        nutrition: nutritionCopy,
-        psych: psychCopy,
-      ),
-    );
-  }
-}
-
-class _StressSleepResult {
-  const _StressSleepResult({
-    required this.stress,
-    required this.sleep,
-    required this.nutrition,
-    required this.psych,
-  });
-
-  final _StressAnswers stress;
-  final _SleepAnswers sleep;
-  final _NutritionResult nutrition;
-  final _PsychResult psych;
-
-  Map<String, dynamic> toStressMap() => stress.toMap();
-  Map<String, dynamic> toStressMapWithLoad() {
-    final map = stress.toMap();
-    map['loadIndex'] = stressLoad;
-    return map;
-  }
-
-  Map<String, dynamic> toSleepMap() => sleep.toMap();
-  Map<String, dynamic> toNutritionMap() => nutrition.toMap();
-  Map<String, dynamic> toPsychMap() => psych.toMap();
-  double get stressLoad =>
-      (stress.normalizedScore * 0.6) + ((100 - sleep.normalizedScore) * 0.4);
-}
-
-class _StressSleepNavigationResult {
-  const _StressSleepNavigationResult.back({
-    required this.stress,
-    required this.sleep,
-    this.nutrition,
-    this.psych,
-  });
-
-  final Map<String, dynamic> stress;
-  final Map<String, dynamic> sleep;
-  final Map<String, dynamic>? nutrition;
-  final Map<String, dynamic>? psych;
-}
-
-/// Nutrition assessment (REAP-S adapted with glycemic add-ons)
-/// Canonical keys: nutrition.instrument, nutrition.raw_score, nutrition.sugary_drinks_per_week, etc.
-class _NutritionAnswers {
-  const _NutritionAnswers({required this.responses});
-
-  final List<int> responses; // 7 items, each 0-4 scale
-
-  /// Raw nutrition score (sum of all responses)
-  /// Higher score = better nutrition habits
-  int get rawScore {
-    return responses.fold<int>(0, (sum, value) => sum + value);
-  }
-
-  double get index {
-    final total = responses.fold<int>(0, (sum, value) => sum + value);
-    return (total / (responses.length * 4)) * 100;
-  }
-
-  /// Glycemic-specific extractions from questionnaire items
-  /// Item 0: Fruit and vegetable servings (0-4 scale, maps to servings)
-  int get vegetablesServingsPerDay {
-    if (responses.isEmpty) return 0;
-    // Scale: 0=rarely, 1=1-2, 2=3-4, 3=5-6, 4=7+
-    // Map to approximate servings: 0→0, 1→2, 2→4, 3→6, 4→8
-    return responses[0] * 2;
-  }
-
-  /// Item 3: Sugary drinks per week (0-4 scale)
-  int get sugaryDrinksPerWeek {
-    if (responses.length < 4) return 0;
-    // Scale: 0=never, 1=1-2, 2=3-4, 3=5-6, 4=7+
-    // Map to approximate count: 0→0, 1→2, 2→4, 3→6, 4→8
-    return responses[3] * 2;
-  }
-
-  /// Item 2: Frequency of fried/high-fat foods (inverse for refined carbs proxy)
-  /// Lower score = better (less fried foods)
-  String get refinedCarbsFrequency {
-    if (responses.length < 3) return 'rarely';
-    final score = responses[2];
-    if (score == 0) return 'rarely';
-    if (score == 1) return 'sometimes';
-    if (score <= 2) return 'often';
-    return 'daily';
-  }
-
-  Map<String, dynamic> toMap() {
-    return {
-      // Legacy keys
-      'items': responses,
-      'index': index,
-      // Canonical keys from data dictionary (REAP-S + glycemic add-ons)
-      'canonical': {
-        'instrument': 'reap_s', // REAP-S adapted
-        'raw_score': rawScore,
-        // Glycemic add-ons
-        'vegetables_servings_per_day': vegetablesServingsPerDay,
-        'sugary_drinks_per_week': sugaryDrinksPerWeek,
-        'refined_carbs_frequency': refinedCarbsFrequency,
-      },
-    };
-  }
-}
-
-class _NutritionResult {
-  const _NutritionResult({required this.nutrition});
-
-  final _NutritionAnswers nutrition;
-
-  Map<String, dynamic> toMap() => nutrition.toMap();
-}
-
-class _NutritionNavigationResult {
-  const _NutritionNavigationResult.back({required this.draft});
-
-  final Map<String, dynamic> draft;
-}
-
-class _PsychQuestionnairePage extends StatefulWidget {
-  const _PsychQuestionnairePage({
-    this.initialAnswers,
-    this.onPsychSaved,
-  });
-
-  final Map<String, dynamic>? initialAnswers;
-  final Future<void> Function(Map<String, dynamic> psych)? onPsychSaved;
-
-  @override
-  State<_PsychQuestionnairePage> createState() =>
-      _PsychQuestionnairePageState();
-}
-
-class _PsychQuestionnairePageState extends State<_PsychQuestionnairePage> {
-  final _formKey = GlobalKey<FormState>();
-  final List<int> _responses = List<int>.filled(5, -1);
-
-  static const _prompts = [
-    'Feeling overwhelmed by the demands of diabetes',
-    'Feeling discouraged with your diabetes efforts',
-    'Feeling that you are failing with your diabetes routine',
-    'Feeling angry, scared, or depressed about living with diabetes',
-    'Feeling that you are not sticking closely enough to good meal or testing plans',
-  ];
-
-  static const _optionLabels = [
-    'Not a problem',
-    'Slight problem',
-    'Moderate problem',
-    'Serious problem',
-    'Major problem',
-  ];
-
-  @override
-  void initState() {
-    super.initState();
-    final raw = widget.initialAnswers;
-    if (raw is Map) {
-      final map = <String, dynamic>{};
-      (raw as Map).forEach((key, value) {
-        map[key.toString()] = value;
-      });
-      final itemsRaw = map['items'];
-      if (itemsRaw is List) {
-        final items = itemsRaw
-            .map((e) => int.tryParse(e.toString()) ?? 0)
-            .toList();
-        for (var i = 0; i < _responses.length && i < items.length; i++) {
-          _responses[i] = items[i].clamp(0, 4);
-        }
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, _) {
-        if (didPop) {
-          return;
-        }
-        _handleBackToNutrition();
-      },
-      child: Scaffold(
-        appBar: AppBar(
-          leading: BackButton(onPressed: _handleBackToNutrition),
-          title: const Text('Health Profile'),
-          bottom: const _QuestionnaireProgressIndicator(
-            currentStep: 5,
-            totalSteps: 7,
-            sectionName: 'Emotional Wellbeing',
-          ),
-        ),
-        body: KeyboardDismissible(
-          child: SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: Form(
-                key: _formKey,
-                autovalidateMode: AutovalidateMode.disabled,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(
-                      'Emotional wellbeing',
-                      style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'How have you felt about diabetes recently?',
-                      style: theme.textTheme.bodyMedium,
-                    ),
-                    const SizedBox(height: 12),
-                    ...List.generate(_responses.length, (index) {
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: _buildQuestion(index, theme),
-                      );
-                    }),
-                    const SizedBox(height: 12),
-                    FilledButton(
-                      onPressed: _handleSubmit,
-                      child: const Text('Finish'),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildQuestion(int index, ThemeData theme) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(_prompts[index], style: theme.textTheme.bodyLarge),
-        const SizedBox(height: 6),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: List.generate(_optionLabels.length, (value) {
-            final selected = _responses[index] == value;
-            return ChoiceChip(
-              label: Text(_optionLabels[value]),
-              selected: selected,
-              onSelected: (_) => setState(() {
-                _responses[index] = value;
-              }),
-            );
-          }),
-        ),
-      ],
-    );
-  }
-
-  void _handleBackToNutrition() {
-    Navigator.of(context).pop(
-      _PsychNavigationResult.backToNutrition(
-        responses: List<int>.from(_responses),
-      ),
-    );
-  }
-
-  Future<void> _handleSubmit() async {
-    FocusScope.of(context).unfocus();
-
-    // Validate all questions have been answered
-    if (_responses.any((r) => r < 0)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please answer all questions'),
-          duration: Duration(seconds: 2),
-        ),
-      );
-      return;
-    }
-
-    final result = _PsychResult(responses: List<int>.from(_responses));
-    if (widget.onPsychSaved != null) {
-      await widget.onPsychSaved!(
-        Map<String, dynamic>.from(result.toMap()),
-      );
-      if (!mounted) {
-        return;
-      }
-    }
-    if (!mounted) {
-      return;
-    }
-    Navigator.of(context).pop(result);
-  }
-}
-
-class _PsychResult {
-  const _PsychResult({required this.responses});
-
-  final List<int> responses;
-
-  double get distressIndex {
-    final total = responses.fold<int>(0, (sum, value) => sum + value);
-    return (total / (responses.length * 4)) * 100;
-  }
-
-  bool get supportNeeded => distressIndex > 60;
-
-  /// Canonical: psych.instrument
-  /// Determined by number of items: 5 items = PAID-5, 2 items = DDS-2
-  String get instrument {
-    if (responses.length == 2) return 'dds2';
-    if (responses.length == 5) return 'paid5';
-    return 'paid5'; // default
-  }
-
-  /// Canonical: psych.raw_score
-  /// Sum of all responses (0-4 scale each)
-  /// PAID-5: 0-20 (5 items × 4 max)
-  /// DDS-2: 0-12 (2 items × 6 max for DDS-2, but we use 0-4 scale = 0-8)
-  /// Note: Current implementation uses 5 items (PAID-5) with 0-4 scale = 0-20 range
-  int get rawScore {
-    return responses.fold<int>(0, (sum, value) => sum + value);
-  }
-
-  Map<String, dynamic> toMap() {
-    return {
-      // Legacy keys (for backward compatibility)
-      'items': responses,
-      'index': distressIndex,
-      'supportNeeded': supportNeeded,
-
-      // Canonical keys from data dictionary
-      'canonical': {
-        'instrument': instrument, // paid5|dds2
-        'raw_score': rawScore, // 0-20 for PAID-5; 0-12 for DDS-2
-        // Individual items for granular analysis
-        'paid5_item1': responses.isNotEmpty ? responses[0] : 0,
-        'paid5_item2': responses.length > 1 ? responses[1] : 0,
-        'paid5_item3': responses.length > 2 ? responses[2] : 0,
-        'paid5_item4': responses.length > 3 ? responses[3] : 0,
-        'paid5_item5': responses.length > 4 ? responses[4] : 0,
-      },
-    };
-  }
-}
-
-class _PsychNavigationResult {
-  const _PsychNavigationResult.backToNutrition({required this.responses})
-    : goBackToNutrition = true;
-
-  final bool goBackToNutrition;
-  final List<int> responses;
-}
-
-class _NutritionQuestionnairePage extends StatefulWidget {
-  const _NutritionQuestionnairePage({
-    this.initialAnswers,
-    this.onNutritionSaved,
-  });
-
-  final Map<String, dynamic>? initialAnswers;
-  final Future<void> Function(Map<String, dynamic> nutrition)? onNutritionSaved;
-
-  @override
-  State<_NutritionQuestionnairePage> createState() =>
-      _NutritionQuestionnairePageState();
-}
-
-class _NutritionQuestionnairePageState
-    extends State<_NutritionQuestionnairePage> {
-  final _formKey = GlobalKey<FormState>();
-  final List<int> _responses = List<int>.filled(7, -1);
-  int _currentNutritionSection = 0; // 0 or 1 for the two sections
-
-  static const _nutritionPrompts = [
-    'Daily fruit and vegetable servings',
-    'Whole grain servings per day',
-    'Frequency of fried or high-fat foods',
-    'Sugary drinks per week',
-    'Eating dinner within 2 hours of bedtime',
-    'Fast food or takeout frequency',
-    'Processed snack intake',
-  ];
-
-  static const _optionLabels = [
-    'Never / rarely',
-    '1–2 times',
-    '3–4 times',
-    '5–6 times',
-    'Daily / most days',
-  ];
-
-  @override
-  void initState() {
-    super.initState();
-    final data = widget.initialAnswers;
-    if (data is Map<String, dynamic> && data['items'] is List) {
-      final items = (data['items'] as List)
-          .map((e) => int.tryParse(e.toString()) ?? 0)
-          .toList();
-      for (var i = 0; i < _responses.length && i < items.length; i++) {
-        _responses[i] = items[i].clamp(0, 4);
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, _) async {
-        if (didPop) {
-          return;
-        }
-        if (_currentNutritionSection == 1) {
-          _goBackToNutritionSection1();
-        } else {
-          await _handleBack();
-        }
-      },
-      child: Scaffold(
-        appBar: AppBar(
-          leading: _currentNutritionSection == 1
-              ? BackButton(onPressed: _goBackToNutritionSection1)
-              : BackButton(onPressed: () => _handleBack()),
-          title: const Text('Health Profile'),
-          bottom: const _QuestionnaireProgressIndicator(
-            currentStep: 6,
-            totalSteps: 7,
-            sectionName: 'Nutrition Patterns',
-          ),
-        ),
-        body: KeyboardDismissible(
-          child: SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: Form(
-                key: _formKey,
-                autovalidateMode: AutovalidateMode.disabled,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(
-                      'Nutrition patterns',
-                      style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      "Tell us about your usual food choices.",
-                      style: theme.textTheme.bodyMedium,
-                    ),
-                    const SizedBox(height: 12),
-                    ..._buildCurrentNutritionSection(theme),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildNutritionQuestion(int index, ThemeData theme) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(_nutritionPrompts[index], style: theme.textTheme.bodyLarge),
-        const SizedBox(height: 6),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: List.generate(_optionLabels.length, (value) {
-            final selected = _responses[index] == value;
-            return ChoiceChip(
-              label: Text(_optionLabels[value]),
-              selected: selected,
-              onSelected: (_) => setState(() {
-                _responses[index] = value;
-              }),
-            );
-          }),
-        ),
-      ],
-    );
-  }
-
-  List<Widget> _buildCurrentNutritionSection(ThemeData theme) {
-    switch (_currentNutritionSection) {
-      case 0:
-        return _buildNutritionSection1(theme);
-      case 1:
-        return _buildNutritionSection2(theme);
-      default:
-        return [];
-    }
-  }
-
-  List<Widget> _buildNutritionSection1(ThemeData theme) {
-    return [
-      // Questions 1-4
-      ...List.generate(4, (index) {
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: _buildNutritionQuestion(index, theme),
-        );
-      }),
-      const SizedBox(height: 12),
-      FilledButton(
-        onPressed: _goToNutritionSection2,
-        child: const Text('Next'),
-      ),
-    ];
-  }
-
-  List<Widget> _buildNutritionSection2(ThemeData theme) {
-    return [
-      // Questions 5-7
-      ...List.generate(3, (index) {
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: _buildNutritionQuestion(index + 4, theme),
-        );
-      }),
-      const SizedBox(height: 12),
-      FilledButton(
-        onPressed: _handleSubmit,
-        child: const Text('(Next) Emotional health'),
-      ),
-    ];
-  }
-
-  void _goToNutritionSection2() {
-    // Validate all questions in section 1 have been answered (first 4 questions)
-    if (_responses.take(4).any((r) => r < 0)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please answer all questions'),
-          duration: Duration(seconds: 2),
-        ),
-      );
-      return;
-    }
-    setState(() {
-      _currentNutritionSection = 1;
-    });
-  }
-
-  void _goBackToNutritionSection1() {
-    setState(() {
-      _currentNutritionSection = 0;
-    });
-  }
-
-  Future<void> _handleSubmit() async {
-    FocusScope.of(context).unfocus();
-
-    // Validate all questions have been answered
-    if (_responses.any((r) => r < 0)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please answer all questions'),
-          duration: Duration(seconds: 2),
-        ),
-      );
-      return;
-    }
-
-    final result = _NutritionResult(
-      nutrition: _NutritionAnswers(responses: List<int>.from(_responses)),
-    );
-    final map = result.toMap();
-    if (widget.onNutritionSaved != null) {
-      await widget.onNutritionSaved!(Map<String, dynamic>.from(map));
-      if (!mounted) {
-        return;
-      }
-    }
-    if (!mounted) {
-      return;
-    }
-    Navigator.of(context).pop(result);
-  }
-
-  Future<void> _handleBack() async {
-    final draft = _NutritionNavigationResult.back(
-      draft: _NutritionAnswers(responses: List<int>.from(_responses)).toMap(),
-    );
-    if (widget.onNutritionSaved != null) {
-      await widget.onNutritionSaved!(
-        Map<String, dynamic>.from(draft.draft),
-      );
-      if (!mounted) {
-        return;
-      }
-    }
-    if (!mounted) {
-      return;
-    }
-    Navigator.of(context).pop(draft);
-  }
-}
-
-class _StressSleepQuestionnairePage extends StatefulWidget {
-  const _StressSleepQuestionnairePage({
-    this.initialStressAnswers,
-    this.initialSleepAnswers,
-    this.initialNutritionAnswers,
-    this.initialPsychAnswers,
-    this.onStressSleepSaved,
-    this.onNutritionSaved,
-    this.onPsychSaved,
-  });
-
-  final Map<String, dynamic>? initialStressAnswers;
-  final Map<String, dynamic>? initialSleepAnswers;
-  final Map<String, dynamic>? initialNutritionAnswers;
-  final Map<String, dynamic>? initialPsychAnswers;
-  final Future<void> Function(
-    Map<String, dynamic> stress,
-    Map<String, dynamic> sleep,
-  )? onStressSleepSaved;
-  final Future<void> Function(Map<String, dynamic> nutrition)? onNutritionSaved;
-  final Future<void> Function(Map<String, dynamic> psych)? onPsychSaved;
-
-  @override
-  State<_StressSleepQuestionnairePage> createState() =>
-      _StressSleepQuestionnairePageState();
-}
-
-class _StressSleepQuestionnairePageState
-    extends State<_StressSleepQuestionnairePage> {
-  final _formKey = GlobalKey<FormState>();
-
-  final List<int> _stressResponses = List<int>.filled(4, -1);
-  final List<int> _sleepResponses = List<int>.filled(7, -1);
-  int _currentStressSleepSection = 0; // 0 or 1 for the two sections
-  Map<String, dynamic>? _initialNutrition;
-  Map<String, dynamic>? _initialPsych;
-
-  static const _stressPrompts = [
-    'Felt unable to control important things?',
-    'Felt confident about handling personal problems?',
-    'Felt things were going your way?',
-    'Felt difficulties were piling up too high?',
-  ];
-
-  static const _sleepPrompts = [
-    'Difficulty falling asleep',
-    'Difficulty staying asleep',
-    'Problems waking too early',
-    'Sleep satisfaction',
-    'Sleep problems interfering with daily life',
-    'Noticeability of sleep problems to others',
-    'Worry about current sleep difficulties',
-  ];
-
-  @override
-  void initState() {
-    super.initState();
-    _applyInitialAnswers();
-  }
-
-  void _applyInitialAnswers() {
-    final stressRaw = widget.initialStressAnswers;
-    if (stressRaw is Map) {
-      final stress = Map<String, dynamic>.from(stressRaw as Map);
-      final itemsRaw = stress['items'];
-      if (itemsRaw is List) {
-        final items = itemsRaw
-            .map((e) => int.tryParse(e.toString()) ?? 0)
-            .toList();
-        for (var i = 0; i < _stressResponses.length && i < items.length; i++) {
-          _stressResponses[i] = items[i].clamp(0, 4);
-        }
-      }
-    }
-    final sleepRaw = widget.initialSleepAnswers;
-    if (sleepRaw is Map) {
-      final sleep = Map<String, dynamic>.from(sleepRaw as Map);
-      final itemsRaw = sleep['items'];
-      if (itemsRaw is List) {
-        final items = itemsRaw
-            .map((e) => int.tryParse(e.toString()) ?? 0)
-            .toList();
-        for (var i = 0; i < _sleepResponses.length && i < items.length; i++) {
-          _sleepResponses[i] = items[i].clamp(0, 4);
-        }
-      }
-    }
-    final nutritionRaw = widget.initialNutritionAnswers;
-    if (nutritionRaw is Map) {
-      final nutrition = <String, dynamic>{};
-      (nutritionRaw as Map).forEach((key, value) {
-        nutrition[key.toString()] = value;
-      });
-      _initialNutrition = nutrition;
-    }
-    final psychRaw = widget.initialPsychAnswers;
-    if (psychRaw is Map) {
-      final psych = <String, dynamic>{};
-      (psychRaw as Map).forEach((key, value) {
-        psych[key.toString()] = value;
-      });
-      _initialPsych = psych;
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, _) {
-        if (didPop) {
-          return;
-        }
-        _handleBackToActivity();
-      },
-      child: Scaffold(
-        appBar: AppBar(
-          leading: BackButton(onPressed: _handleBackToActivity),
-          title: const Text('Health Profile'),
-          bottom: const _QuestionnaireProgressIndicator(
-            currentStep: 7,
-            totalSteps: 7,
-            sectionName: 'Stress & Sleep',
-          ),
-        ),
-        body: KeyboardDismissible(
-          child: SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: Form(
-                key: _formKey,
-                autovalidateMode: AutovalidateMode.disabled,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(
-                      'Stress & Sleep',
-                      style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Share how stress and sleep feel over the past few weeks.',
-                      style: theme.textTheme.bodyMedium,
-                    ),
-                    const SizedBox(height: 12),
-                    ..._buildCurrentStressSleepSection(theme),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  List<Widget> _buildCurrentStressSleepSection(ThemeData theme) {
-    switch (_currentStressSleepSection) {
-      case 0:
-        return _buildStressSleepSection1(theme);
-      case 1:
-        return _buildStressSleepSection2(theme);
-      default:
-        return [];
-    }
-  }
-
-  List<Widget> _buildStressSleepSection1(ThemeData theme) {
-    return [
-                    Text(
-                      'Perceived Stress (last month)',
-                      style: theme.textTheme.titleMedium,
-                    ),
-                    const SizedBox(height: 6),
-                    ...List.generate(_stressResponses.length, (index) {
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: _buildStressQuestion(index),
-                      );
-                    }),
-                    const SizedBox(height: 16),
-                    FilledButton(
-                      onPressed: _goToStressSleepSection2,
-                      child: const Text('Next'),
-                    ),
-    ];
-  }
-
-  List<Widget> _buildStressSleepSection2(ThemeData theme) {
-    return [
-                    const SizedBox(height: 12),
-                    Text(
-                      'Sleep quality (past 2 weeks)',
-                      style: theme.textTheme.titleMedium,
-                    ),
-                    const SizedBox(height: 6),
-                    ...List.generate(_sleepResponses.length, (index) {
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: _buildSleepQuestion(index),
-                      );
-                    }),
-                    const SizedBox(height: 16),
-                    FilledButton(
-                      onPressed: _handleSubmit,
-                      child: const Text('(Next) Nutritional Health'),
-                    ),
-    ];
-  }
-
-  void _goToStressSleepSection2() {
-    // Validate all stress questions have been answered
-    if (_stressResponses.any((r) => r < 0)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please answer all stress questions'),
-          duration: Duration(seconds: 2),
-        ),
-      );
-      return;
-    }
-    setState(() {
-      _currentStressSleepSection = 1;
-    });
-  }
-
-  void _handleBackToActivity() {
-    final stressAnswers = _StressAnswers(
-      responses: List<int>.from(_stressResponses),
-    );
-    final sleepAnswers = _SleepAnswers(
-      responses: List<int>.from(_sleepResponses),
-    );
-    final stressMap = stressAnswers.toMap()
-      ..['loadIndex'] = _computeStressLoad(stressAnswers, sleepAnswers);
-    final sleepMap = sleepAnswers.toMap();
-    final nutritionCopy = _initialNutrition != null
-        ? Map<String, dynamic>.from(_initialNutrition!)
-        : null;
-    final psychCopy = _initialPsych != null
-        ? Map<String, dynamic>.from(_initialPsych!)
-        : null;
-    Navigator.of(context).pop(
-      _StressSleepNavigationResult.back(
-        stress: stressMap,
-        sleep: sleepMap,
-        nutrition: nutritionCopy,
-        psych: psychCopy,
-      ),
-    );
-  }
-
-  double _computeStressLoad(
-    _StressAnswers stressAnswers,
-    _SleepAnswers sleepAnswers,
-  ) {
-    return (stressAnswers.normalizedScore * 0.6) +
-        ((100 - sleepAnswers.normalizedScore) * 0.4);
-  }
-
-  Widget _buildStressQuestion(int index) {
-    final options = const [
-      'Never',
-      'Almost never',
-      'Sometimes',
-      'Fairly often',
-      'Very often',
-    ];
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(_stressPrompts[index]),
-        const SizedBox(height: 4),
-        Wrap(
-          spacing: 8,
-          children: List.generate(options.length, (value) {
-            final selected = _stressResponses[index] == value;
-            return ChoiceChip(
-              label: Text(options[value]),
-              selected: selected,
-              onSelected: (_) => setState(() {
-                _stressResponses[index] = value;
-              }),
-            );
-          }),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSleepQuestion(int index) {
-    final options = List<String>.generate(5, (value) => value.toString());
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(_sleepPrompts[index]),
-        const SizedBox(height: 4),
-        Wrap(
-          spacing: 8,
-          children: List.generate(options.length, (value) {
-            final selected = _sleepResponses[index] == value;
-            return ChoiceChip(
-              label: Text(value.toString()),
-              selected: selected,
-              onSelected: (_) => setState(() {
-                _sleepResponses[index] = value;
-              }),
-            );
-          }),
-        ),
-      ],
-    );
-  }
-
-  Future<void> _handleSubmit() async {
-    FocusScope.of(context).unfocus();
-
-    // Validate all sleep questions have been answered
-    if (_sleepResponses.any((r) => r < 0)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please answer all sleep questions'),
-          duration: Duration(seconds: 2),
-        ),
-      );
-      return;
-    }
-
-    final stress = _StressAnswers(responses: List<int>.from(_stressResponses));
-    final sleep = _SleepAnswers(responses: List<int>.from(_sleepResponses));
-    final stressMap = stress.toMap()
-      ..['loadIndex'] = _computeStressLoad(stress, sleep);
-    final sleepMap = sleep.toMap();
-
-    if (widget.onStressSleepSaved != null) {
-      await widget.onStressSleepSaved!(
-        Map<String, dynamic>.from(stressMap),
-        Map<String, dynamic>.from(sleepMap),
-      );
-    }
-
-    final firstNutritionOutcome = await Navigator.of(context)
-        .push<Object?>(
-          _buildHealthQuestionnaireRoute(
-            page: _NutritionQuestionnairePage(
-              initialAnswers: _initialNutrition,
-              onNutritionSaved: widget.onNutritionSaved,
-            ),
-            fullscreenDialog: true,
-          ),
-        );
-
-    if (!mounted) {
-      return;
-    }
-
-    if (firstNutritionOutcome is _NutritionNavigationResult) {
-      final draft = Map<String, dynamic>.from(firstNutritionOutcome.draft);
-      _initialNutrition = draft;
-      return;
-    }
-
-    if (firstNutritionOutcome is! _NutritionResult) {
-      return;
-    }
-
-    final firstNutritionResult = firstNutritionOutcome;
-    final firstNutritionMap = firstNutritionResult.toMap();
-    _initialNutrition = firstNutritionMap;
-
-    var currentNutritionResult = firstNutritionResult;
-
-    Map<String, dynamic>? psychInitialAnswers = _initialPsych;
-
-    while (mounted) {
-      final psychOutcome = await Navigator.of(context).push<Object?>(
-        _buildHealthQuestionnaireRoute(
-          page: _PsychQuestionnairePage(
-            initialAnswers: psychInitialAnswers,
-            onPsychSaved: widget.onPsychSaved,
-          ),
-          fullscreenDialog: true,
-        ),
-      );
-
-      if (!mounted) {
-        return;
-      }
-
-      if (psychOutcome is _PsychResult) {
-        final psychMap = psychOutcome.toMap();
-        _initialPsych = psychMap;
-        if (widget.onPsychSaved != null) {
-          await widget.onPsychSaved!(Map<String, dynamic>.from(psychMap));
-        }
-        Navigator.of(context).pop(
-          _StressSleepResult(
-            stress: stress,
-            sleep: sleep,
-            nutrition: currentNutritionResult,
-            psych: psychOutcome,
-          ),
-        );
-        return;
-      }
-
-      if (psychOutcome is _PsychNavigationResult &&
-          psychOutcome.goBackToNutrition) {
-        psychInitialAnswers = {'items': List<int>.from(psychOutcome.responses)};
-        _initialPsych = psychInitialAnswers;
-
-        final updatedNutritionOutcome = await Navigator.of(context)
-            .push<Object?>(
-              _buildHealthQuestionnaireRoute(
-                page: _NutritionQuestionnairePage(
-                  initialAnswers: _initialNutrition,
-                  onNutritionSaved: widget.onNutritionSaved,
-                ),
-                fullscreenDialog: true,
-              ),
-            );
-
-        if (!mounted) {
-          return;
-        }
-
-        if (updatedNutritionOutcome is _NutritionNavigationResult) {
-          final draft =
-              Map<String, dynamic>.from(updatedNutritionOutcome.draft);
-          _initialNutrition = draft;
-          return;
-        }
-
-        if (updatedNutritionOutcome is! _NutritionResult) {
-          return;
-        }
-
-        final updatedNutrition = updatedNutritionOutcome;
-        currentNutritionResult = updatedNutrition;
-        final updatedNutritionMap = updatedNutrition.toMap();
-        _initialNutrition = updatedNutritionMap;
-        continue;
-      }
-
-      return;
+    if (result != null) {
+      setState(() => _supplements.add(result));
     }
   }
 }

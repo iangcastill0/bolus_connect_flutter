@@ -298,17 +298,17 @@ class ProfileMetrics {
     final baseline = answers['baseline'] as Map<String, dynamic>?;
 
     final activityData = baseline?['activity'] as Map<String, dynamic>?;
-    final stressData = baseline?['stress'] as Map<String, dynamic>?;
+    final mentalData = baseline?['mental'] as Map<String, dynamic>?;
     final sleepData = baseline?['sleep'] as Map<String, dynamic>?;
     final nutritionData = baseline?['nutrition'] as Map<String, dynamic>?;
-    final psychData = baseline?['psych'] as Map<String, dynamic>?;
+    final generalData = baseline?['general'] as Map<String, dynamic>?;
 
     // Calculate Activity Index from IPAQ-SF (MET minutes)
     final activityIndex = _calculateActivityIndex(activityData);
     final activityLabel = _getActivityLabel(activityIndex);
 
     // Calculate Stress Load from PSS-4 (0-16 scale, inverted and normalized)
-    final stressLoad = _calculateStressLoad(stressData);
+    final stressLoad = _calculateStressLoad(mentalData, generalData);
     final stressLabel = _getStressLabel(stressLoad);
 
     // Calculate Sleep Quality from ISI-7 (0-28 scale, inverted and normalized)
@@ -320,7 +320,7 @@ class ProfileMetrics {
     final nutritionLabel = _getNutritionLabel(nutritionQuality);
 
     // Calculate Emotional Wellbeing from PAID-5 (0-20 scale, inverted)
-    final emotionalWellbeing = _calculateEmotionalWellbeing(psychData);
+    final emotionalWellbeing = _calculateEmotionalWellbeing(mentalData);
     final emotionalLabel = _getEmotionalLabel(emotionalWellbeing);
 
     return ProfileMetrics(
@@ -362,18 +362,29 @@ class ProfileMetrics {
     return 'Low';
   }
 
-  static int _calculateStressLoad(Map<String, dynamic>? data) {
-    if (data == null) return 50; // Default moderate
+  static int _calculateStressLoad(
+    Map<String, dynamic>? mentalData,
+    Map<String, dynamic>? generalData,
+  ) {
+    if (mentalData == null && generalData == null) return 50;
 
-    final canonical = data['canonical'] as Map<String, dynamic>?;
-    final pss4Score = canonical?['pss4_score'] as int? ?? 0;
+    final canonical = mentalData?['canonical'] as Map<String, dynamic>?;
+    final stressScore = canonical?['stress_score'] as num?;
+    if (stressScore != null) {
+      return stressScore.round().clamp(0, 100);
+    }
 
-    // PSS-4: 0-16 scale (higher = more stress)
-    // Convert to 0-100: 0 = no stress (100), 16 = high stress (100)
-    // Inverted: lower PSS-4 = better score
-    final normalized = ((16 - pss4Score) / 16 * 100).round().clamp(0, 100);
-    // But for "Stress Load" we want higher = worse, so invert again
-    return (100 - normalized).clamp(0, 100);
+    final stressLevel = mentalData?['stress']?.toString();
+    int base = switch (stressLevel) {
+      'low' => 25,
+      'moderate' => 55,
+      'high' => 80,
+      _ => 50,
+    };
+    if (mentalData?['burnoutIndicators'] == true) base += 10;
+    final selfRated = generalData?['selfRatedHealth']?.toString();
+    if (selfRated == 'poor') base += 10;
+    return base.clamp(0, 100);
   }
 
   static String _getStressLabel(int score) {
@@ -387,12 +398,26 @@ class ProfileMetrics {
     if (data == null) return 50; // Default moderate
 
     final canonical = data['canonical'] as Map<String, dynamic>?;
-    final isiScore = canonical?['isi_score'] as int? ?? 0;
+    final sleepScore = canonical?['sleep_score'] as num?;
+    if (sleepScore != null) {
+      return sleepScore.round().clamp(0, 100);
+    }
 
-    // ISI-7: 0-28 scale (higher = worse insomnia)
-    // 0-7 = no insomnia, 8-14 = subthreshold, 15-21 = moderate, 22-28 = severe
-    // Convert to quality score: 0 ISI = 100 quality, 28 ISI = 0 quality
-    return ((28 - isiScore) / 28 * 100).round().clamp(0, 100);
+    final hours = data['avgHours'] as num?;
+    final quality = data['quality']?.toString();
+    int base = 50;
+    if (hours != null) {
+      if (hours >= 7.5) {
+        base = 80;
+      } else if (hours >= 6) {
+        base = 60;
+      } else {
+        base = 35;
+      }
+    }
+    if (quality == 'restorative') base += 10;
+    if (quality == 'poor') base -= 15;
+    return base.clamp(0, 100);
   }
 
   static String _getSleepLabel(int score) {
@@ -406,13 +431,27 @@ class ProfileMetrics {
     if (data == null) return 50; // Default moderate
 
     final canonical = data['canonical'] as Map<String, dynamic>?;
-    final rawScore = canonical?['raw_score'] as int? ?? 0;
+    final nutritionScore = canonical?['nutrition_score'] as num?;
+    if (nutritionScore != null) {
+      return nutritionScore.round().clamp(0, 100);
+    }
 
-    // REAP-S: typically 0-4 per item, 7 items = 0-28 max
-    // Higher score = better nutrition
-    // Normalize to 0-100
-    final maxScore = 28;
-    return ((rawScore / maxScore) * 100).round().clamp(0, 100);
+    final diet = data['dietPattern']?.toString();
+    int base = switch (diet) {
+      'Mediterranean' => 80,
+      'Balanced' => 70,
+      'Plant-forward/vegetarian' => 70,
+      'High protein' => 65,
+      'Low carb' => 65,
+      'Other' => 60,
+      _ => 55,
+    };
+    final alcohol = data['alcohol']?.toString();
+    if (alcohol == 'heavy') base -= 15;
+    if (alcohol == 'moderate') base -= 5;
+    final hydration = data['hydrationLiters'] as num?;
+    if (hydration != null && hydration >= 2) base += 5;
+    return base.clamp(0, 100);
   }
 
   static String _getNutritionLabel(int score) {
@@ -426,11 +465,21 @@ class ProfileMetrics {
     if (data == null) return 50; // Default moderate
 
     final canonical = data['canonical'] as Map<String, dynamic>?;
-    final paidScore = canonical?['raw_score'] as int? ?? 0;
+    final emotionalScore = canonical?['emotional_score'] as num?;
+    if (emotionalScore != null) {
+      return emotionalScore.round().clamp(0, 100);
+    }
 
-    // PAID-5: 0-20 scale (higher = more distress)
-    // Convert to wellbeing score: 0 PAID = 100 wellbeing, 20 PAID = 0 wellbeing
-    return ((20 - paidScore) / 20 * 100).round().clamp(0, 100);
+    final mood = data['mood']?.toString();
+    int base = switch (mood) {
+      'stable' => 75,
+      'variable' => 55,
+      'low' => 40,
+      _ => 50,
+    };
+    if (data['focusIssues'] == true) base -= 5;
+    if (data['burnoutIndicators'] == true) base -= 10;
+    return base.clamp(0, 100);
   }
 
   static String _getEmotionalLabel(int score) {
