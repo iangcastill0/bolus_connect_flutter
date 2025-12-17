@@ -97,6 +97,19 @@ flutter clean
 - Uses Firebase ID token for authentication
 - Fails gracefully if endpoint not configured (debug-only logging)
 
+#### `TipBankService` (`lib/services/tip_bank_service.dart`)
+- Manages personalized health tips based on user's selected health conditions
+- Loads tip bank from `assets/tip_bank.json` containing condition-specific tips organized by time of day (morning/afternoon/evening)
+- **Time-based tip selection**: Automatically determines current time block and shows relevant tips
+  - Morning: 04:00-11:59
+  - Afternoon: 12:00-17:59
+  - Evening: 18:00-23:59 (late night 00:00-03:59 uses evening tips)
+- **Multi-condition support**: Merges tips from all user's selected conditions and deduplicates similar content
+- **Repetition avoidance**: Tracks last 7 shown tips and avoids repeating them
+- **Daily persistence**: Shows one tip per time block per day (seeded by date for consistency)
+- Falls back to general wellness tips if no conditions selected or no tips available
+- Integrated into Home page to display personalized health guidance
+
 ### Bolus Calculation Logic
 Located in `lib/screens/bolus_page.dart`, the core calculation:
 

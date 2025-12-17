@@ -1,0 +1,524 @@
+{
+  "conditions": {
+    "hypertension": {
+      "name": "Essential Hypertension",
+      "icd10": "I10",
+      "tips": {
+        "morning": [
+          "Start your day with 5 minutes of slow breathing. Gentle diaphragmatic breathing can calm your nervous system and reduce systolic blood pressure by 5–10 mmHg.",
+          "Add a potassium-rich food to breakfast. A banana, kiwi, or spinach helps balance sodium and supports better blood pressure control.",
+          "Drink a glass of water before your coffee. Hydration prevents the transient rise in blood pressure caused by caffeine.",
+          "Take a relaxed 10–15 minute walk. Morning walking improves artery flexibility and lowers blood pressure across the day.",
+          "Skip salty foods at breakfast. Even small sodium reductions can meaningfully lower blood pressure over time."
+        ],
+        "afternoon": [
+          "Walk for 10–15 minutes after lunch. This stabilizes blood sugar and naturally lowers blood pressure.",
+          "Enjoy a magnesium-rich snack like almonds. Magnesium helps blood vessels relax.",
+          "Keep sipping water regularly. Mild dehydration can increase blood pressure without you noticing.",
+          "Stand and stretch every hour. Short movement breaks reduce work-related blood pressure spikes.",
+          "Avoid energy drinks. They raise heart rate and blood pressure rapidly."
+        ],
+        "evening": [
+          "Have an early, light dinner. Late eating increases nighttime blood pressure.",
+          "Add nitrate-rich foods like arugula or beetroot. These improve nitric oxide availability and help vasodilation.",
+          "Stretch gently for 10 minutes before bed. Muscle relaxation reduces sympathetic tone.",
+          "Limit screen time before sleep. Blue light elevates cortisol and worsens night-time blood pressure.",
+          "Keep your bedroom cool. Cooler temperatures help regulate nighttime blood pressure.",
+          "Try hibiscus tea. Evidence shows small but real reductions in systolic pressure.",
+          "Watch hidden salt. Many sauces and breads secretly raise your total sodium for the day.",
+          "Use progressive muscle relaxation. It's proven to reduce sympathetic activation.",
+          "Take your medication at consistent times. Steady dosing helps maintain stable blood pressure.",
+          "Aim for 7–9 hours of sleep. Poor sleep raises both systolic and diastolic blood pressure."
+        ]
+      }
+    },
+    "type2_diabetes": {
+      "name": "Type 2 Diabetes Mellitus",
+      "icd10": "E11",
+      "tips": {
+        "morning": [
+          "Start your morning with a 10–15 min walk. Light movement improves morning insulin sensitivity and reduces glucose spikes.",
+          "Choose a high-protein breakfast. Protein stabilizes blood sugar and keeps you full longer.",
+          "Avoid fruit juices. Liquid sugars raise glucose faster than whole fruit.",
+          "Hydrate before coffee. Water reduces the cortisol-related glucose rise after caffeine.",
+          "Add cinnamon to oats or yogurt. Evidence shows cinnamon can modestly support glucose control."
+        ],
+        "afternoon": [
+          "Walk 10 minutes after meals. Post-meal walking reduces glucose by enhancing muscle uptake.",
+          "Include colorful vegetables at lunch. Fiber slows carbohydrate absorption.",
+          "Practice mindful eating. Eating slowly reduces glucose spikes significantly.",
+          "Choose water or tea instead of soft drinks. Sugary beverages worsen insulin resistance.",
+          "Add a handful of nuts as a snack. Healthy fats stabilize glucose."
+        ],
+        "evening": [
+          "Keep dinner lower in carbohydrates. Evening carbs tend to raise glucose longer.",
+          "Include lean protein and vegetables. Improves overnight glucose stability.",
+          "Take a relaxed evening walk. Helps reduce bedtime glucose levels.",
+          "Avoid late-night snacking. Night eating worsens glycemic control.",
+          "Try a calming tea like chamomile. Stress hormones elevate glucose.",
+          "Prioritize 7–9 hours of sleep. Poor sleep increases insulin resistance.",
+          "Limit alcohol. Alcohol destabilizes overnight glucose patterns.",
+          "Do gentle stretching before bed. Lowers sympathetic activation.",
+          "Track your morning glucose trends. Insight improves long-term control.",
+          "Keep healthy snacks visible and simple. Reduces impulse eating of high-carb foods."
+        ]
+      }
+    },
+    "dyslipidemia": {
+      "name": "Mixed Dyslipidemia",
+      "icd10": "E78.5",
+      "tips": {
+        "morning": [
+          "Choose oatmeal with berries. This combo reduces LDL and improves triglycerides.",
+          "Add chia or flaxseed. Plant omega-3s help regulate lipid metabolism.",
+          "Take a short morning walk. Helps activate fat oxidation pathways.",
+          "Skip pastries. Refined carbs worsen triglycerides and LDL.",
+          "Eat whole fruit, not juice. Preserves fiber and improves lipid response."
+        ],
+        "afternoon": [
+          "Do 30–40 minutes of strength training. Resistance exercise improves HDL and lowers TG.",
+          "Avoid ultra-processed snacks. They damage lipid profiles.",
+          "Fill half your plate with vegetables. Fiber enhances cholesterol clearance.",
+          "Add avocado or olive oil. Healthy fats improve lipid ratios.",
+          "Include oily fish 2–3× per week. Strong evidence for triglyceride reduction."
+        ],
+        "evening": [
+          "Have a fiber-rich dinner. Fiber binds LDL and improves overnight lipid patterns.",
+          "Avoid simple sugars at night. They raise triglycerides significantly.",
+          "Drink green tea. Small LDL-lowering effect.",
+          "Skip alcohol. Alcohol directly increases triglycerides.",
+          "Do a calming routine. Stress worsens lipid metabolism.",
+          "Aim for restorative sleep. Poor sleep correlates strongly with dyslipidemia.",
+          "Include legumes in dinner. They're excellent for lipid control.",
+          "Keep drinking water throughout the evening. Hydration supports metabolic regulation.",
+          "Avoid fried foods. They raise LDL immediately.",
+          "Cut trans fats completely. Even tiny amounts worsen lipid health."
+        ]
+      }
+    },
+    "obesity": {
+      "name": "Obesity (General)",
+      "icd10": "E66.9",
+      "tips": {
+        "morning": [
+          "Start with a glass of water. Hydration supports appetite control.",
+          "Eat a protein-rich breakfast. Reduces cravings later in the day.",
+          "Do light morning movement. 10 minutes are enough to boost metabolism.",
+          "Avoid pastries and sugary coffees. They increase hunger and fat storage.",
+          "Add fiber early. Fiber increases satiety hormones."
+        ],
+        "afternoon": [
+          "Have vegetables at every meal. They help calorie control without hunger.",
+          "Train strength 3–4 days a week. Muscle increases metabolic rate.",
+          "Avoid calorie-dense snacks. Keep simple options like fruit or yogurt.",
+          "Take short movement breaks. Sitting suppresses fat metabolism.",
+          "Drink tea or water instead of soda. Reduces daily calorie load."
+        ],
+        "evening": [
+          "Eat dinner slightly earlier. Late eating promotes fat storage.",
+          "Keep dinner balanced but lighter. Helps overnight metabolism.",
+          "Avoid emotional eating triggers. Use mindfulness before choosing food.",
+          "Take an after-dinner walk. Helps digestion and calorie burn.",
+          "Avoid alcohol. Alcohol contributes excess calories quickly.",
+          "Sleep well. Poor sleep increases appetite hormones.",
+          "Do gentle stretching. Helps regulate nighttime stress.",
+          "Keep screens minimal. Prevents late-night snacking.",
+          "Prepare tomorrow's meals. Planning reduces overeating.",
+          "Celebrate small wins. Consistency matters more than perfection."
+        ]
+      }
+    },
+    "pcos": {
+      "name": "Polycystic Ovary Syndrome",
+      "icd10": "E28.2",
+      "tips": {
+        "morning": [
+          "Choose a high-protein, low-sugar breakfast. PCOS is insulin-sensitive—protein helps stabilize hormones.",
+          "Get bright light exposure early. Supports hormonal rhythms and reduces inflammation.",
+          "Walk 10 minutes after eating. Helps improve insulin sensitivity.",
+          "Add cinnamon to breakfast. Some evidence suggests it supports glucose control.",
+          "Hydrate before caffeine. Reduces cortisol spikes that affect PCOS symptoms."
+        ],
+        "afternoon": [
+          "Strength training improves PCOS. Builds muscle and improves insulin resistance.",
+          "Add colorful vegetables and whole grains. Fiber regulates hormones and glucose.",
+          "Avoid sugary drinks. They worsen insulin resistance and symptoms.",
+          "Practice stress management. Cortisol imbalance can worsen PCOS cycles.",
+          "Include omega-3 foods. They reduce inflammation and support ovarian function."
+        ],
+        "evening": [
+          "Eat a balanced dinner with lean protein. Helps control evening hunger.",
+          "Avoid eating very late. Late-night glucose elevations worsen PCOS.",
+          "Take a calming walk. Supports digestion and glucose control.",
+          "Try magnesium-rich foods. Magnesium supports hormone balance.",
+          "Do gentle stretching. Reduces stress-driven cravings.",
+          "Avoid alcohol if possible. Alcohol worsens hormonal fluctuations.",
+          "Limit screen time before bed. Supports melatonin and circadian rhythm.",
+          "Sip herbal tea. Peppermint may help with digestive symptoms.",
+          "Plan tomorrow's meals. Reduces impulsive eating.",
+          "Aim for solid sleep. Poor sleep worsens PCOS symptoms."
+        ]
+      }
+    },
+    "sleep_apnea": {
+      "name": "Obstructive Sleep Apnea",
+      "icd10": "G47.33",
+      "tips": {
+        "morning": [
+          "Start your day with a full glass of water. Hydration reduces upper-airway dryness and morning fatigue common in OSA.",
+          "Get 10–15 minutes of morning sunlight. Light exposure helps reset circadian rhythms disrupted by fragmented sleep.",
+          "Do gentle neck and chest mobility. Improving airway muscle tone can help reduce OSA symptoms.",
+          "Choose a high-protein breakfast. Stable energy prevents morning sleepiness and cravings.",
+          "Walk for 10 minutes after breakfast. Light activity helps reduce inflammation and improves daytime alertness."
+        ],
+        "afternoon": [
+          "Have balanced meals without heavy sugars. Spikes in glucose increase daytime sleepiness and worsen OSA fatigue.",
+          "Take short movement breaks every hour. Reduces drowsiness and improves oxygenation.",
+          "Avoid alcohol at lunch. Even small amounts reduce airway muscle tone later at night.",
+          "Practice 2 minutes of nasal breathing exercises. Helps strengthen nasal airflow pathways.",
+          "Choose anti-inflammatory foods like leafy greens. OSA is strongly linked to airway inflammation."
+        ],
+        "evening": [
+          "Eat dinner 2–3 hours before bed. Late or heavy meals worsen apnea severity.",
+          "Limit alcohol completely at night. Alcohol relaxes upper airway muscles and increases apnea episodes.",
+          "Avoid sedatives unless prescribed. They reduce airway tone and breathing drive.",
+          "Do gentle stretching or yoga. Reduces sympathetic activation common in OSA.",
+          "Use nasal saline spray if congested. Nose obstruction significantly worsens apneas.",
+          "Keep your bedroom cool. Cooler temperatures support more stable breathing.",
+          "Sleep on your side if possible. Supine sleep increases airway collapse.",
+          "Limit screens 60–90 min before bed. Blue light affects sleep depth.",
+          "Follow your CPAP routine if prescribed. Consistency dramatically improves symptoms.",
+          "Aim for 7–9 hours of sleep. Chronic sleep restriction worsens apnea severity."
+        ]
+      }
+    },
+    "insomnia": {
+      "name": "Insomnia (Chronic)",
+      "icd10": "F51.04",
+      "tips": {
+        "morning": [
+          "Expose yourself to bright sunlight within 30 minutes of waking. This anchors your circadian rhythm and improves nighttime sleep.",
+          "Avoid checking your phone in the first minutes of waking. Starting calm reduces stress hormones that affect sleep later.",
+          "Eat a balanced breakfast. Stable glucose throughout the day improves nighttime relaxation.",
+          "Do light physical activity. Even 10 minutes boosts serotonin, which converts to melatonin at night.",
+          "Avoid oversleeping. Keep wake-up times consistent to regulate your body clock."
+        ],
+        "afternoon": [
+          "Limit caffeine after midday. Even small amounts delay melatonin production in sensitive individuals.",
+          "Plan a short walk after lunch. Movement reduces afternoon sluggishness and improves nighttime tiredness.",
+          "Avoid long naps. If needed, keep them under 20 minutes.",
+          "Eat smaller portions during the day. Large meals affect nighttime rest.",
+          "Manage stress proactively. A 2-minute breathing break reduces cortisol that interferes with sleep."
+        ],
+        "evening": [
+          "Create a wind-down routine. Repeating the same steps signals your brain to prepare for sleep.",
+          "Dim the lights 1 hour before bed. Darkness triggers melatonin release.",
+          "Avoid screens at least 60 minutes before sleeping. Blue light is a strong melatonin blocker.",
+          "Keep dinner light and earlier. Heavy meals delay sleep onset.",
+          "Try a calming herbal tea. Chamomile, lavender, and valerian can promote mild relaxation.",
+          "Take a warm shower. Cooling post-shower helps induce sleepiness.",
+          "Avoid alcohol before bed. It fragments sleep architecture and worsens awakenings.",
+          "Write down your worries. \"Brain-dumping\" reduces rumination.",
+          "Make your room dark, cool, and quiet. Ideal environment improves sleep efficiency.",
+          "Be consistent with bedtime. Circadian regularity is the strongest treatment for chronic insomnia."
+        ]
+      }
+    },
+    "depression": {
+      "name": "Depression (Major Depressive Disorder)",
+      "icd10": "F33.9",
+      "tips": {
+        "morning": [
+          "Start your morning slowly and kindly. Before grabbing your phone, take one deep breath and remind yourself you're doing the best you can.",
+          "Get bright sunlight within the first 15 minutes. Even cloudy-day light boosts serotonin and helps regulate your mood chemistry.",
+          "Eat a protein-rich breakfast. Eggs, yogurt, or oats stabilize glucose and support neurotransmitter production.",
+          "Move your body gently—no pressure. A 5–10 minute walk is enough to increase dopamine and reduce morning heaviness.",
+          "Drink a glass of water before coffee. Hydration improves energy, and caffeine hits smoother when your nervous system isn't stressed."
+        ],
+        "afternoon": [
+          "Aim for one small \"win\" after lunch. Respond to one message, tidy one corner, finish one tiny task—micro-achievements support dopamine pathways.",
+          "Eat balanced meals with color. Vegetables and omega-3s reduce neuroinflammation linked to low mood.",
+          "Take a 3-minute movement break every hour. It resets your brain chemistry and improves cognitive clarity.",
+          "Practice \"gentle self-talk.\" Instead of \"I should be doing more,\" try \"I'm moving at the pace my body can handle today.\"",
+          "Reduce sugar during the afternoon slump. Sugar crashes worsen low mood and fatigue."
+        ],
+        "evening": [
+          "Keep dinner simple and light. Heavy meals worsen nighttime anxiety and sleep disturbances.",
+          "Do a quiet, easy wind-down ritual. A warm shower, soft music, or low lighting helps your brain shift into \"safety mode.\"",
+          "Limit alcohol—it numbs short-term but worsens depression long-term. Protect your mood chemistry.",
+          "Do gentle stretching while breathing slowly. This reduces physical tension that often amplifies emotional heaviness.",
+          "Avoid doom-scrolling before bed. Your brain is more vulnerable to negative content at night.",
+          "Sip a calming tea (chamomile, lemon balm). Simple, but clinically proven to improve sleep quality.",
+          "Do one tiny act of self-kindness. Write down one thing you handled today. Your brain needs evidence of progress.",
+          "Set a consistent bedtime. Mood and circadian rhythm are tightly linked; regularity is powerful.",
+          "Prepare your morning space. Lay out clothes, prep water—reduces decision fatigue when mood is low.",
+          "Remind yourself: tomorrow is another chance. Depression distorts perspective—anchoring in hope matters."
+        ]
+      }
+    },
+    "anxiety": {
+      "name": "Generalized Anxiety Disorder",
+      "icd10": "F41.1",
+      "tips": {
+        "morning": [
+          "Start your day with one deep, slow breath. Anxiety peaks in the morning; grounding early helps calm the nervous system.",
+          "Get outside into natural light. Morning sunlight reduces cortisol and signals safety to your brain.",
+          "Eat a steady, protein-based breakfast. Stabilizes glucose, preventing anxiety-like shakiness and irritability.",
+          "Avoid checking messages immediately. Give your mind 5–10 minutes of quiet before external input.",
+          "Do gentle movement—nothing intense. Light walking or stretching reduces muscle tension from nighttime worry."
+        ],
+        "afternoon": [
+          "Pause for 2 minutes of box breathing. Inhale 4 seconds, hold 4, exhale 4, hold 4—slows anxious circuits almost instantly.",
+          "Choose balanced meals without excessive caffeine. Caffeine can mimic anxiety symptoms; keeping it moderate helps.",
+          "Schedule \"worry time\" for later. If something stressful pops up, note it down and promise to revisit it tonight.",
+          "Take micro-breaks to relax your shoulders and jaw. Anxiety lives in the body; releasing tension signals safety to your brain.",
+          "Avoid sugar-heavy snacks in the afternoon. Insulin spikes can increase jitteriness and worsen anxiety."
+        ],
+        "evening": [
+          "Have a calm, early dinner. Going to bed with a full stomach increases nighttime anxiety and heart rate.",
+          "Do a gentle \"body scan.\" From toes to head, notice and relax each muscle group—reduces somatic tension.",
+          "Lower the lights 1 hour before bed. Darkness supports melatonin, which naturally calms anxious brain activity.",
+          "Avoid stimulating content. No news, no intense conversations—your nervous system is more reactive at night.",
+          "Sip a calming tea. Lemon balm, lavender, or chamomile have mild anxiolytic effects.",
+          "Write down tomorrow's to-do list. Externalizing worries keeps them from looping in your mind.",
+          "Practice slow exhalation breathing. Long exhales activate the vagus nerve and reduce anxiety.",
+          "Use a weighted blanket if you enjoy it. Deep pressure can decrease sympathetic activation.",
+          "Keep your bedroom cool and quiet. Anxiety improves when sensory input is reduced.",
+          "Tell yourself: \"I'm safe right now.\" Anxiety imagines the future—grounding in the present moment interrupts the spiral."
+        ]
+      }
+    },
+    "nafld": {
+      "name": "Non-alcoholic Fatty Liver Disease",
+      "icd10": "K76.0",
+      "tips": {
+        "morning": [
+          "Hydrate early. Helps liver metabolism start smoothly.",
+          "Choose a protein + fiber breakfast. Reduces hepatic fat production.",
+          "Avoid sugary cereals or pastries. Simple sugars lead to fat accumulation in the liver.",
+          "Walk a little after breakfast. Improves insulin sensitivity, crucial for NAFLD.",
+          "Add healthy fats like olive oil. Supports better liver markers."
+        ],
+        "afternoon": [
+          "Choose whole foods at lunch. Reduces liver fat storage.",
+          "Include leafy greens. They support liver detox and fat metabolism.",
+          "Avoid sugary drinks completely. Strongest dietary driver of NAFLD.",
+          "Strength training improves liver fat. Even short sessions help.",
+          "Stay hydrated in small amounts. Helps metabolic processes."
+        ],
+        "evening": [
+          "Eat an early, balanced dinner. Reduces nighttime liver fat production.",
+          "Avoid heavy, fatty meals. They stress the liver during digestion.",
+          "Take a slow walk after dinner. Improves hepatic glucose handling.",
+          "Limit alcohol completely. Essential for NAFLD recovery.",
+          "Do relaxation techniques. Stress worsens liver inflammation.",
+          "Sleep well. Rest improves liver regeneration.",
+          "Avoid desserts. Evening fructose drives liver fat accumulation.",
+          "Drink herbal tea. Chamomile or mint supports digestion.",
+          "Plan tomorrow's meals. Prevents sugary food choices.",
+          "Focus on consistency. Liver fat decreases gradually with small habits."
+        ]
+      }
+    },
+    "ckd": {
+      "name": "Chronic Kidney Disease",
+      "icd10": "N18",
+      "tips": {
+        "morning": [
+          "Start your day with moderate hydration. Enough water supports kidney perfusion, but avoid over-drinking if you have fluid restrictions.",
+          "Choose a low-sodium breakfast. Early salt control reduces blood pressure—critical in CKD.",
+          "Eat low-potassium fruits if needed (apples, pears). Protects kidney balance depending on your stage.",
+          "Do gentle morning movement. Circulation improves filtration and reduces stiffness.",
+          "Avoid high-protein shakes unless prescribed. Excess protein increases kidney workload."
+        ],
+        "afternoon": [
+          "Walk 10–15 minutes after meals. Helps stabilize glucose and reduces kidney stress.",
+          "Eat balanced meals with lean protein. Controlled protein intake protects filtration rate.",
+          "Choose whole foods over processed foods. Processed foods are often high in phosphorus and sodium.",
+          "Stay hydrated in small amounts. Frequent small sips are better for kidney function.",
+          "Avoid NSAIDs unless medically required. They worsen kidney function significantly."
+        ],
+        "evening": [
+          "Keep dinner light and low in sodium. Prevents nighttime fluid retention.",
+          "Avoid high-phosphorus foods (cola, processed meats). High phosphorus accelerates CKD progression.",
+          "Try gentle stretching. Reduces muscle tension common in CKD.",
+          "Avoid alcohol. Alcohol increases dehydration and kidney load.",
+          "Relax with a warm herbal tea suitable for kidney patients. Chamomile is a gentle option.",
+          "Plan your next day's meals. Helps control sodium, potassium, and protein.",
+          "Elevate legs if mild swelling occurs. Reduces fluid retention.",
+          "Limit screens before bed. Helps sleep, which supports metabolic and renal health.",
+          "Stick to medication timing. Hypertension and phosphate binders work best consistently.",
+          "Aim for 7–9 hours of sleep. Rest supports kidney recovery and reduces inflammation."
+        ]
+      }
+    },
+    "gerd": {
+      "name": "Gastroesophageal Reflux Disease",
+      "icd10": "K21.9",
+      "tips": {
+        "morning": [
+          "Start your day with warm water, not coffee immediately. This wakes the digestive system gently and reduces early reflux.",
+          "Choose a light, non-greasy breakfast. Fatty foods relax the lower esophageal sphincter and worsen reflux.",
+          "Keep your posture upright for at least 20 minutes after eating. Gravity helps prevent acid backflow.",
+          "Avoid citrus fruits first thing. Citrus increases acidity in sensitive individuals.",
+          "Try gentle morning movement. Walking improves esophageal motility."
+        ],
+        "afternoon": [
+          "Eat smaller, more frequent meals. Large meals increase pressure on the esophagus.",
+          "Avoid spicy or fried foods at lunch. They are common GERD triggers.",
+          "Drink water throughout the afternoon. Staying hydrated dilutes stomach acid.",
+          "Don't lie down or recline after meals. Wait at least 2–3 hours.",
+          "Manage stress with brief breathing breaks. Stress increases stomach acid production."
+        ],
+        "evening": [
+          "Have an early, light dinner. Eating too close to bedtime is one of the strongest GERD triggers.",
+          "Avoid tomato-based sauces at night. High acidity worsens nighttime reflux.",
+          "Limit alcohol completely in the evening. Alcohol relaxes the esophageal sphincter.",
+          "Try a calming herbal tea (chamomile or ginger). Supports digestion and reduces irritation.",
+          "Raise the head of your bed slightly. Helps prevent nighttime reflux episodes.",
+          "Avoid chocolate after dinner. Chocolate is a known GERD trigger.",
+          "Don't wear tight clothing around the stomach. It increases abdominal pressure.",
+          "Practice gentle stretching. Helps digestion and reduces tension.",
+          "Limit screens before bed. Stress and late eating both worsen reflux.",
+          "Aim for restful sleep. Poor sleep increases nighttime acid sensitivity."
+        ]
+      }
+    },
+    "rheumatoid_arthritis": {
+      "name": "Rheumatoid Arthritis",
+      "icd10": "M06.9",
+      "tips": {
+        "morning": [
+          "Start your day with gentle joint mobility. RA stiffness improves with slow, controlled movement.",
+          "Warm your hands or take a warm shower. Heat therapy reduces morning inflammation and pain.",
+          "Choose an anti-inflammatory breakfast (berries + oats). Antioxidants support joint health.",
+          "Stay hydrated early. Hydration helps reduce morning joint stiffness.",
+          "Include omega-3 foods. Omega-3s have strong anti-inflammatory effects in RA."
+        ],
+        "afternoon": [
+          "Take frequent movement breaks. Inactivity worsens stiffness and pain.",
+          "Eat balanced meals with vegetables and lean protein. Reduces inflammatory load.",
+          "Avoid processed foods. They increase inflammation and joint symptoms.",
+          "Practice stress reduction. Stress can trigger inflammatory flares.",
+          "Do low-impact exercise. Walking, cycling, or swimming support mobility safely."
+        ],
+        "evening": [
+          "Keep dinner anti-inflammatory. Avoid heavy oils, fried foods, and excess sugar.",
+          "Apply warmth or a heating pad if needed. Helps relax joints after a long day.",
+          "Do gentle stretching or yoga. Keeps joints mobile and reduces nighttime stiffness.",
+          "Avoid alcohol. Alcohol increases inflammation and worsens sleep quality.",
+          "Have a calming herbal tea. Ginger and turmeric blends can offer mild relief.",
+          "Prepare tomorrow's activity plan. Staying active helps prevent flares.",
+          "Avoid screens near bedtime. Better sleep reduces inflammation markers.",
+          "Use supportive pillows for joint comfort. Helps align joints during sleep.",
+          "Practice slow breathing. Calms the nervous system and reduces pain perception.",
+          "Aim for 7–9 hours of sleep. Deep sleep lowers inflammatory cytokines."
+        ]
+      }
+    },
+    "migraine": {
+      "name": "Migraine",
+      "icd10": "G43.909",
+      "tips": {
+        "morning": [
+          "Wake up at the same time daily. Regular circadian rhythm reduces migraine frequency dramatically.",
+          "Hydrate before caffeine. Dehydration is a common morning trigger.",
+          "Have a stable, protein-rich breakfast. Low blood sugar can trigger migraines in many people.",
+          "Get soft sunlight exposure. Gentle morning light stabilizes serotonin and circadian alignment.",
+          "Do slow neck and shoulder mobility. Tension in these muscles is a major migraine trigger."
+        ],
+        "afternoon": [
+          "Avoid skipping lunch. Missing meals is one of the strongest migraine triggers.",
+          "Choose foods without artificial sweeteners. Aspartame and similar additives can provoke migraines in sensitive people.",
+          "Take posture breaks. Poor posture increases cervical tension, a common migraine pathway.",
+          "Reduce screen glare. Bright artificial light can trigger neurological sensitivity.",
+          "Stay hydrated consistently. Even mild dehydration increases migraine intensity."
+        ],
+        "evening": [
+          "Eat an early, balanced dinner. Late meals disrupt sleep and increase migraine risk.",
+          "Avoid alcohol, especially wine. Red wine is one of the most common migraine triggers.",
+          "Dim lights 1 hour before sleep. Helps calm sensory pathways involved in migraines.",
+          "Do gentle breathing or meditation. Reduces stress-driven migraines.",
+          "Stretch your neck, traps, and jaw. Muscle tension often precedes a migraine attack.",
+          "Avoid screens in bed. Blue light triggers neurological overstimulation.",
+          "Use a cool compress if needed. Cooling the forehead or neck can reduce early migraine sensations.",
+          "Keep your bedroom cool and quiet. Migraines worsen with heat and noise.",
+          "Prepare for tomorrow calmly. Stress anticipation is a known trigger.",
+          "Aim for stable, deep sleep. Good sleep is one of the strongest migraine protectors."
+        ]
+      }
+    },
+    "none": {
+      "name": "General Wellness",
+      "icd10": null,
+      "tips": {
+        "morning": [
+          "Start your day with a full glass of water. Overnight dehydration is common—morning hydration boosts energy and cognition.",
+          "Get 10–15 minutes of natural light exposure. Morning sunlight stabilizes your circadian rhythm and boosts serotonin.",
+          "Take 5 slow breaths before touching your phone. A calm start reduces stress hormones for the entire day.",
+          "Have a protein-rich breakfast. Stable glucose = better focus and reduced cravings.",
+          "Avoid sugary cereals or pastries. They spike glucose and crash energy mid-morning.",
+          "Do 5–10 minutes of gentle movement. Even stretching wakes up joints and muscles.",
+          "Practice gratitude for one minute. Proven to reduce stress and improve mood.",
+          "Open a window and breathe fresh air. Improves oxygenation and alertness.",
+          "Make your bed slowly and mindfully. A small task completed boosts dopamine.",
+          "Take a short walk outdoors if possible. Morning walking improves metabolic health.",
+          "Eat a piece of fruit instead of juice. Fiber slows sugar absorption.",
+          "Drink coffee after breakfast, not before. Reduces cortisol spikes.",
+          "Check in with how your body feels today. Set the pace intentionally.",
+          "Limit morning news exposure. Reduces anxiety bias early in the day.",
+          "Plan 3 priorities, not 10. Keeps your brain focused and reduces overwhelm.",
+          "Take a few shoulder rolls. Tension builds overnight—releasing it prevents headaches.",
+          "Avoid doom-scrolling. Your nervous system is more vulnerable in the morning.",
+          "Use soft natural light instead of harsh artificial light. Helps circadian alignment.",
+          "Eat mindfully. Sit down, breathe, and avoid rushing breakfast.",
+          "Stretch your spine gently. Improves posture and reduces stiffness."
+        ],
+        "afternoon": [
+          "Eat a balanced lunch with protein, vegetables, and whole grains. Maintains stable energy through the afternoon.",
+          "Avoid eating too fast. Digestive health improves with mindful eating.",
+          "Take a 10-minute walk after lunch. Reduces glucose spikes and boosts focus.",
+          "Drink water regularly. Mild dehydration causes tiredness and headaches.",
+          "Avoid sugary drinks. They increase fatigue two hours later.",
+          "Take a posture check. Shoulders back, neck long—reduces back strain.",
+          "Stand up every 60 minutes. Improves circulation and metabolic health.",
+          "Have a fruit or nuts snack if hungry. Avoid ultra-processed afternoon cravings.",
+          "Keep caffeine moderate. Too much disrupts nighttime sleep.",
+          "Stretch your hips and lower back. Sitting shortens hip flexors and causes discomfort.",
+          "Take a few deep breaths before stressful tasks. Nervous system resets quickly.",
+          "Stay in natural light if possible. Prevents daytime sleepiness.",
+          "Avoid heavy lunches. Large meals reduce alertness.",
+          "Try a 2-minute walk break between meetings. Helps reduce mental fatigue.",
+          "Get fresh air. Oxygen refreshes your brain.",
+          "Identify tension points in your body. Relax your jaw, shoulders, or chest.",
+          "Hydrate before feeling thirsty. Thirst means you're already dehydrated.",
+          "Avoid emotional snacking. Eat with intention, not as a reaction.",
+          "Organize your desk slightly. Small order = mental clarity.",
+          "Use soft music to maintain focus. Helps productivity without stress."
+        ],
+        "evening": [
+          "Have an early and light dinner. Avoiding large evening meals protects sleep and metabolism.",
+          "Avoid eating 2–3 hours before bed. Helps digestion settle and improves sleep.",
+          "Dim the lights 1 hour before bedtime. Signals melatonin production.",
+          "Avoid screens close to bedtime. Blue light delays sleep onset.",
+          "Do slow stretching or yoga. Helps release tension built through the day.",
+          "Drink a calming herbal tea. Chamomile, lemon balm, or lavender support relaxation.",
+          "Avoid alcohol at night. Alcohol harms sleep architecture.",
+          "Take a warm shower. Body temperature drop after helps induce sleepiness.",
+          "Practice 4–7–8 breathing. Reduces heart rate and calms the mind.",
+          "Lower room temperature slightly. Cool rooms produce deeper sleep.",
+          "Avoid intense workouts late at night. Too much adrenaline delays sleep.",
+          "Write a short to-do list for tomorrow. Clears mental clutter.",
+          "Disconnect from work emails. Set boundaries that protect your mind.",
+          "Read something light. Soft cognitive stimulation prepares the brain for rest.",
+          "Avoid sugary snacks in the evening. Sugar disrupts sleep hormones.",
+          "Use soft, warm lighting. Helps nervous system downshift.",
+          "Do a \"brain dump\" journaling session. Write everything down to stop ruminating.",
+          "Disconnect from social media. Reduces overstimulation and comparisons.",
+          "Spend 5 minutes breathing calmly. Slow exhalations activate the vagus nerve.",
+          "Check in with your emotions: \"What do I need tonight?\""
+        ]
+      }
+    }
+  }
+}

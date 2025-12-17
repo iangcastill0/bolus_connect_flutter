@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../services/bolus_log_service.dart';
 import '../services/glucose_statistics.dart';
 import '../services/insights_service.dart';
+import '../services/tip_bank_service.dart';
 import '../widgets/add_glucose_modal.dart';
 import '../widgets/add_exercise_modal.dart';
 import '../widgets/add_mood_modal.dart';
@@ -25,26 +26,15 @@ class _HomePageState extends State<HomePage> {
   GlucoseStatistics? _stats;
   List<InsightCard> _insights = [];
   bool _loading = true;
-  String _coachingHint = '';
-
-  // Coaching hints that rotate based on app opens
-  static const List<String> _coachingHints = [
-    'Try checking your glucose two hours after lunch today.',
-    'Evening walks help reduce next-day highs.',
-    'Stable sleep equals stable glucose variability.',
-    'Protein before carbs can help stabilize post-meal spikes.',
-    'Stress management techniques may improve your glucose control.',
-    'Consistent meal timing supports better glucose patterns.',
-    'Light activity after meals can help lower glucose levels.',
-    'Hydration plays a key role in glucose management.',
-  ];
+  String? _healthTip;
+  final TipBankService _tipBankService = TipBankService();
 
   @override
   void initState() {
     super.initState();
     widget.refreshTick?.addListener(_handleRefreshTick);
     _loadData();
-    _selectCoachingHint();
+    _loadHealthTip();
   }
 
   @override
@@ -66,13 +56,13 @@ class _HomePageState extends State<HomePage> {
     _loadData();
   }
 
-  void _selectCoachingHint() {
-    // Rotate hints based on current day to keep it fresh but stable throughout the day
-    final dayOfYear = DateTime.now().difference(DateTime(DateTime.now().year, 1, 1)).inDays;
-    final hintIndex = dayOfYear % _coachingHints.length;
-    setState(() {
-      _coachingHint = _coachingHints[hintIndex];
-    });
+  Future<void> _loadHealthTip() async {
+    final tip = await _tipBankService.getTipOfTheDay();
+    if (mounted) {
+      setState(() {
+        _healthTip = tip;
+      });
+    }
   }
 
   Future<void> _loadData() async {
@@ -462,8 +452,8 @@ class _HomePageState extends State<HomePage> {
           ),
         ),
         const SizedBox(height: 32),
-        // Coaching Hint Banner
-        if (_coachingHint.isNotEmpty) ...[
+        // Health Tip Banner
+        if (_healthTip != null && _healthTip!.isNotEmpty) ...[
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -491,7 +481,7 @@ class _HomePageState extends State<HomePage> {
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Icon(
-                    Icons.lightbulb_outline,
+                    _getTimeIcon(),
                     color: theme.colorScheme.primary,
                     size: 20,
                   ),
@@ -502,7 +492,7 @@ class _HomePageState extends State<HomePage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Coach Hint',
+                        '${_getTimeLabel()} Health Tip',
                         style: theme.textTheme.labelLarge?.copyWith(
                           color: theme.colorScheme.primary,
                           fontWeight: FontWeight.bold,
@@ -510,7 +500,7 @@ class _HomePageState extends State<HomePage> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        _coachingHint,
+                        _healthTip!,
                         style: theme.textTheme.bodyMedium?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant,
                         ),
@@ -575,6 +565,32 @@ class _HomePageState extends State<HomePage> {
   Color _getStatusColor(GlucoseStatistics stats) {
     // Use the same logic as glucose color for consistency
     return _getGlucoseColor(stats.averageGlucose, stats);
+  }
+
+  String _getTimeLabel() {
+    final timeBlock = _tipBankService.getCurrentTimeBlock();
+    switch (timeBlock) {
+      case TimeBlock.morning:
+        return 'Morning';
+      case TimeBlock.afternoon:
+        return 'Afternoon';
+      case TimeBlock.evening:
+      case TimeBlock.late:
+        return 'Evening';
+    }
+  }
+
+  IconData _getTimeIcon() {
+    final timeBlock = _tipBankService.getCurrentTimeBlock();
+    switch (timeBlock) {
+      case TimeBlock.morning:
+        return Icons.wb_sunny_outlined;
+      case TimeBlock.afternoon:
+        return Icons.wb_sunny;
+      case TimeBlock.evening:
+      case TimeBlock.late:
+        return Icons.nightlight_outlined;
+    }
   }
 }
 

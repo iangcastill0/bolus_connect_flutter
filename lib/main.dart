@@ -42,22 +42,25 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Bolus Connect',
       theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // TRY THIS: Try running your application with "flutter run". You'll see
-        // the application has a purple toolbar. Then, without quitting the app,
-        // try changing the seedColor in the colorScheme below to Colors.green
-        // and then invoke "hot reload" (save your changes or press the "hot
-        // reload" button in a Flutter-supported IDE, or press "r" if you used
-        // the command line to start the app).
-        //
-        // Notice that the counter didn't reset back to zero; the application
-        // state is not lost during the reload. To reset the state, use hot
-        // restart instead.
-        //
-        // This works for code too, not just values: Most code changes can be
-        // tested with just a hot reload.
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+        fontFamily: 'SF Pro Text',
+        textTheme: const TextTheme(
+          displayLarge: TextStyle(fontFamily: 'SF Pro Display'),
+          displayMedium: TextStyle(fontFamily: 'SF Pro Display'),
+          displaySmall: TextStyle(fontFamily: 'SF Pro Display'),
+          headlineLarge: TextStyle(fontFamily: 'SF Pro Display'),
+          headlineMedium: TextStyle(fontFamily: 'SF Pro Display'),
+          headlineSmall: TextStyle(fontFamily: 'SF Pro Text'),
+          titleLarge: TextStyle(fontFamily: 'SF Pro Text'),
+          titleMedium: TextStyle(fontFamily: 'SF Pro Text'),
+          titleSmall: TextStyle(fontFamily: 'SF Pro Text'),
+          bodyLarge: TextStyle(fontFamily: 'SF Pro Text'),
+          bodyMedium: TextStyle(fontFamily: 'SF Pro Text'),
+          bodySmall: TextStyle(fontFamily: 'SF Pro Text'),
+          labelLarge: TextStyle(fontFamily: 'SF Pro Text'),
+          labelMedium: TextStyle(fontFamily: 'SF Pro Text'),
+          labelSmall: TextStyle(fontFamily: 'SF Pro Text'),
+        ),
       ),
       // Use an auth gate so signed-in users stay signed in
       home: const AuthGate(),
