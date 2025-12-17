@@ -177,6 +177,13 @@ Available variables:
 - Firebase authentication for user management
 
 ## Contributing
+[TIP BANK PATHOLOGIES .pdf](https://github.com/user-attachments/files/24218192/TIP.BANK.PATHOLOGIES.pdf)
+
+[Changes - TIll sleep quality  (1).pdf](https://github.com/user-attachments/files/24218195/Changes.-.TIll.sleep.quality.1.pdf)
+
+[SCORING AND RISK RATIOS .pdf](https://github.com/user-attachments/files/24218197/SCORING.AND.RISK.RATIOS.pdf)
+
+
 
 For detailed development guidelines and architectural patterns, see [CLAUDE.md](CLAUDE.md).
 
